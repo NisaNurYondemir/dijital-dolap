@@ -4,11 +4,14 @@ from database import engine
 from models import user, clothing, outfit
 from routers.auth_router import router as auth_router
 from routers.clothing_router import router as clothing_router
+from routers.outfit_router import router as outfit_router
+
 
 app = FastAPI(title="Dijital Dolap API")
 
 app.include_router(auth_router)
 app.include_router(clothing_router)
+app.include_router(outfit_router)
 
 @app.get("/")
 def root():
