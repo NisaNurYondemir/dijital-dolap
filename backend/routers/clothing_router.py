@@ -1,36 +1,27 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
-from typing import Optional
 from auth import get_db, get_current_user
 from models.user import User
 from models.clothing import Clothing
+from schemas.clothing import ClothingCreate, ClothingUpdate, ClothingOut
 
 router = APIRouter(prefix="/clothes", tags=["clothes"])
 
-# --- Şemalar ---
-class ClothingCreate(BaseModel):
-    category: str
-    season: str
-    hue: Optional[float] = None
-    saturation: Optional[float] = None
-    lightness: Optional[float] = None
-    color_name: Optional[str] = None
-    is_dirty: bool = False
-    needs_ironing: bool = False
+# Veritabanında boş olamayan alanlar: PATCH ile null gönderilemez
+REQUIRED_FIELDS = {"category", "season", "is_dirty", "needs_ironing"}
 
-class ClothingUpdate(BaseModel):
-    category: Optional[str] = None
-    season: Optional[str] = None
-    hue: Optional[float] = None
-    saturation: Optional[float] = None
-    lightness: Optional[float] = None
-    color_name: Optional[str] = None
-    is_dirty: Optional[bool] = None
-    needs_ironing: Optional[bool] = None
 
-# --- Endpoint'ler ---
-@router.post("/", status_code=201)
+def get_owned_clothing(item_id: int, db: Session, user: User) -> Clothing:
+    item = db.query(Clothing).filter(
+        Clothing.id == item_id,
+        Clothing.user_id == user.id,
+    ).first()
+    if not item:
+        raise HTTPException(404, "Kıyafet bulunamadı")
+    return item
+
+
+@router.post("/", response_model=ClothingOut, status_code=201)
 def create_clothing(
     req: ClothingCreate,
     db: Session = Depends(get_db),
@@ -42,47 +33,43 @@ def create_clothing(
     db.refresh(item)
     return item
 
-@router.get("/")
+
+@router.get("/", response_model=list[ClothingOut])
 def list_clothes(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     return db.query(Clothing).filter(Clothing.user_id == current_user.id).all()
 
-@router.get("/{item_id}")
+
+@router.get("/{item_id}", response_model=ClothingOut)
 def get_clothing(
     item_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    item = db.query(Clothing).filter(
-        Clothing.id == item_id,
-        Clothing.user_id == current_user.id
-    ).first()
-    if not item:
-        raise HTTPException(404, "Kıyafet bulunamadı")
-    return item
+    return get_owned_clothing(item_id, db, current_user)
 
-@router.patch("/{item_id}")
+
+@router.patch("/{item_id}", response_model=ClothingOut)
 def update_clothing(
     item_id: int,
     req: ClothingUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    item = db.query(Clothing).filter(
-        Clothing.id == item_id,
-        Clothing.user_id == current_user.id
-    ).first()
-    if not item:
-        raise HTTPException(404, "Kıyafet bulunamadı")
+    item = get_owned_clothing(item_id, db, current_user)
 
-    for field, value in req.model_dump(exclude_unset=True).items():
+    changes = req.model_dump(exclude_unset=True)
+    for field, value in changes.items():
+        if value is None and field in REQUIRED_FIELDS:
+            raise HTTPException(422, f"'{field}' alanı boş bırakılamaz")
         setattr(item, field, value)
 
     db.commit()
     db.refresh(item)
     return item
+
 
 @router.delete("/{item_id}", status_code=204)
 def delete_clothing(
@@ -90,12 +77,6 @@ def delete_clothing(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    item = db.query(Clothing).filter(
-        Clothing.id == item_id,
-        Clothing.user_id == current_user.id
-    ).first()
-    if not item:
-        raise HTTPException(404, "Kıyafet bulunamadı")
-
+    item = get_owned_clothing(item_id, db, current_user)
     db.delete(item)
     db.commit()
