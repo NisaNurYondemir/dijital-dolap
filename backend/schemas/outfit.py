@@ -22,3 +22,7 @@ class OutfitOut(BaseModel):
     is_favorite: bool
     created_at: datetime
     clothes: list[ClothingOut]
+
+class OutfitSuggestion(BaseModel):
+    score: float
+    clothes: list[ClothingOut]

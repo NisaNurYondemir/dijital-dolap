@@ -1,15 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+
 from auth import get_db, get_current_user
-from models.user import User
+from color_engine import Color, score_outfit
 from models.clothing import Clothing
 from models.outfit import Outfit
-from schemas.outfit import OutfitCreate, OutfitUpdate, OutfitOut
-from color_engine import Color, score_outfit
+from models.user import User
+from schemas.clothing import ClothingOut, Season
+from schemas.outfit import OutfitCreate, OutfitOut, OutfitSuggestion, OutfitUpdate
+from suggestion import suggest_outfits
 
 router = APIRouter(prefix="/outfits", tags=["outfits"])
-
-
 def get_owned_outfit(outfit_id: int, db: Session, user: User) -> Outfit:
     outfit = db.query(Outfit).filter(
         Outfit.id == outfit_id,
@@ -53,6 +56,31 @@ def list_outfits(
 ):
     return db.query(Outfit).filter(Outfit.user_id == current_user.id).all()
 
+@router.get("/suggest", response_model=list[OutfitSuggestion])
+def suggest(
+    season: Optional[Season] = None,
+    limit: int = Query(5, ge=1, le=20),
+    include_shoes: bool = True,
+    include_outerwear: bool = False,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Giyilebilir kıyafetlerden renk uyumuna göre en iyi kombinleri önerir."""
+    clothes = db.query(Clothing).filter(Clothing.user_id == current_user.id).all()
+    results = suggest_outfits(
+        clothes,
+        season=season,
+        limit=limit,
+        include_shoes=include_shoes,
+        include_outerwear=include_outerwear,
+    )
+    return [
+        OutfitSuggestion(
+            score=round(r.score, 3),
+            clothes=[ClothingOut.model_validate(i) for i in r.items],
+        )
+        for r in results
+    ]
 
 @router.get("/{outfit_id}", response_model=OutfitOut)
 def get_outfit(
