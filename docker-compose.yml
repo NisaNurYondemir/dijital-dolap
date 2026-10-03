@@ -2,6 +2,7 @@ services:
   db:
     image: postgres:15
     container_name: dolap_db
+    restart: unless-stopped
     environment:
       POSTGRES_USER: dolap
       POSTGRES_PASSWORD: dolap123

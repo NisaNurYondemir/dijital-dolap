@@ -12,8 +12,11 @@ from dataclasses import dataclass
 from typing import Optional
 
 from colorthief import ColorThief
-from rembg import remove
 from PIL import Image
+from rembg import new_session, remove
+
+
+_SESSION = new_session("u2net")
 
 
 @dataclass
@@ -32,10 +35,9 @@ class ProcessingResult:
     color: Optional[ColorResult]
 
 
-def remove_background(image_bytes: bytes) -> bytes:
-    """Görselden arka planı kaldırır, PNG olarak döner."""
-    return remove(image_bytes)
 
+def remove_background(image_bytes: bytes) -> bytes:
+    return remove(image_bytes, session=_SESSION)
 
 def extract_dominant_color(image_bytes: bytes) -> ColorResult:
     """Görselden dominant rengi çıkarır, HSL olarak döner."""

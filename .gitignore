@@ -1,4 +1,16 @@
-venv/
+# Python
 __pycache__/
-.env
 *.pyc
+.pytest_cache/
+venv/
+.venv/
+
+# Gizli bilgiler
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Kullanıcı yüklemeleri ve test çıktıları
+backend/uploads/
+backend/test_output.png

@@ -14,6 +14,7 @@ class ClothingCreate(BaseModel):
     color_name: Optional[str] = Field(default=None, max_length=50)
     is_dirty: bool = False
     needs_ironing: bool = False
+    is_ironed: bool = False
 
 
 class ClothingUpdate(BaseModel):
@@ -25,6 +26,7 @@ class ClothingUpdate(BaseModel):
     color_name: Optional[str] = Field(default=None, max_length=50)
     is_dirty: Optional[bool] = None
     needs_ironing: Optional[bool] = None
+    is_ironed: Optional[bool] = None
 
 
 class ClothingOut(BaseModel):
@@ -40,5 +42,7 @@ class ClothingOut(BaseModel):
     color_name: Optional[str]
     is_dirty: bool
     needs_ironing: bool
+    is_ironed: bool
     image_path: Optional[str]
     created_at: datetime
+    is_wearable: bool
