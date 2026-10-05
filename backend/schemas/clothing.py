@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Literal, Optional
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 Season = Literal["yaz", "kis", "ilkbahar", "sonbahar", "tum"]
 
@@ -45,4 +45,8 @@ class ClothingOut(BaseModel):
     is_ironed: bool
     image_path: Optional[str]
     created_at: datetime
-    is_wearable: bool
+
+    @computed_field
+    @property
+    def is_wearable(self) -> bool:
+        return (not self.is_dirty) and ((not self.needs_ironing) or self.is_ironed)
