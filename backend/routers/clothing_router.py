@@ -1,23 +1,23 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from typing import Optional
-from auth import get_db, get_current_user
-from models.user import User
-from models.clothing import Clothing
-from schemas.clothing import ClothingCreate, ClothingUpdate, ClothingOut
 import logging
+import re
+import shutil
+import time
 import uuid
-from pathlib import Path
 from io import BytesIO
-from PIL import Image, UnidentifiedImageError
-import logging
-import uuid
 from pathlib import Path
 from typing import Optional
-from fastapi import UploadFile, File
-from image_processing import process_clothing_image
-from clip_category import predict_category
 
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from PIL import Image, UnidentifiedImageError
+from sqlalchemy.orm import Session
+
+from analysis import color_name, suggest_season
+from auth import get_current_user, get_db
+from clip_category import predict_category, predict_top_categories
+from image_processing import process_clothing_image
+from models.clothing import Clothing
+from models.user import User
+from schemas.clothing import ClothingCreate, ClothingOut, ClothingUpdate
 logger = logging.getLogger(__name__)
 
 # Çalıştırma klasöründen bağımsız: backend/uploads
@@ -25,7 +25,10 @@ UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
 ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP"}
-
+TMP_DIR = UPLOAD_DIR / "tmp"
+TMP_DIR.mkdir(exist_ok=True)
+TMP_MAX_AGE_SECONDS = 60 * 60  # geçici görseller 1 saat saklanır
+_TMP_NAME = re.compile(r"^(\d+)_[0-9a-f]{32}\.png$")
 
 def _detect_format(data: bytes):
     """Dosyanın gerçek biçimini içeriğine bakarak bulur (başlığa güvenmez)."""
@@ -34,6 +37,39 @@ def _detect_format(data: bytes):
             return img.format
     except (UnidentifiedImageError, OSError):
         return None
+
+def _flatten_on_white(png_bytes: bytes) -> bytes:
+    """Şeffaf arka planlı PNG'yi beyaz zemine oturtur (CLIP siyah zeminde yanılır)."""
+    with Image.open(BytesIO(png_bytes)) as img:
+        base = Image.new("RGBA", img.size, (255, 255, 255, 255))
+        base.alpha_composite(img.convert("RGBA"))
+        out = BytesIO()
+        base.convert("RGB").save(out, format="JPEG", quality=90)
+        return out.getvalue()
+
+
+def _cleanup_tmp() -> None:
+    """Bir saatten eski geçici görselleri siler."""
+    limit = time.time() - TMP_MAX_AGE_SECONDS
+    for f in TMP_DIR.glob("*.png"):
+        try:
+            if f.stat().st_mtime < limit:
+                f.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+def _claim_tmp_image(temp_image: str, user: User) -> str:
+    """Kullanıcının geçici görselini kalıcı klasöre taşır, göreli yolunu döner."""
+    match = _TMP_NAME.match(temp_image)
+    if not match or int(match.group(1)) != user.id:
+        raise HTTPException(400, "Geçersiz geçici görsel")
+    src = TMP_DIR / temp_image
+    if not src.is_file():
+        raise HTTPException(410, "Geçici görselin süresi dolmuş, fotoğrafı yeniden yükleyin")
+    filename = f"{user.id}_{uuid.uuid4().hex}.png"
+    shutil.move(str(src), str(UPLOAD_DIR / filename))
+    return f"uploads/{filename}"
 
 router = APIRouter(prefix="/clothes", tags=["clothes"])
 
@@ -51,18 +87,71 @@ def get_owned_clothing(item_id: int, db: Session, user: User) -> Clothing:
     return item
 
 
+@router.post("/analyze")
+def analyze_clothing_image(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    """Fotoğrafı kayıt açmadan analiz eder. Kullanıcı sonucu onaylayınca
+    POST /clothes/ ile (temp_image alanıyla) kaydedilir."""
+    _cleanup_tmp()
+
+    image_bytes = file.file.read(MAX_UPLOAD_BYTES + 1)
+    if len(image_bytes) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "Dosya çok büyük (en fazla 10 MB)")
+    if _detect_format(image_bytes) not in ALLOWED_FORMATS:
+        raise HTTPException(415, "Desteklenmeyen dosya formatı. JPEG, PNG veya WEBP gönderin.")
+
+    try:
+        result = process_clothing_image(image_bytes)
+        top = predict_top_categories(_flatten_on_white(result.image_bytes), k=3)
+    except Exception:
+        logger.exception("Analiz hatası")
+        raise HTTPException(422, "Görsel işlenemedi, geçerli bir görsel gönderin")
+
+    filename = f"{current_user.id}_{uuid.uuid4().hex}.png"
+    (TMP_DIR / filename).write_bytes(result.image_bytes)
+
+    color = result.color
+    hue = color.hue if color else None
+    saturation = color.saturation if color else None
+    lightness = color.lightness if color else None
+    category = top[0][0]
+
+    return {
+        "temp_image": filename,
+        "preview_path": f"uploads/tmp/{filename}",
+        "category": category,
+        "category_candidates": [
+            {"category": c, "probability": round(p, 3)} for c, p in top
+        ],
+        "season": suggest_season(category),
+        "hue": hue,
+        "saturation": saturation,
+        "lightness": lightness,
+        "color_name": color_name(hue, saturation, lightness),
+    }
+
+
 @router.post("/", response_model=ClothingOut, status_code=201)
 def create_clothing(
     req: ClothingCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    item = Clothing(user_id=current_user.id, **req.model_dump())
-    db.add(item)
-    db.commit()
+    data = req.model_dump(exclude={"temp_image"})
+    image_path = _claim_tmp_image(req.temp_image, current_user) if req.temp_image else None
+
+    item = Clothing(user_id=current_user.id, image_path=image_path, **data)
+    try:
+        db.add(item)
+        db.commit()
+    except Exception:
+        db.rollback()
+        _delete_image_file(image_path)  # kayıt başarısızsa taşınan dosyayı geri temizle
+        raise
     db.refresh(item)
     return item
-
 
 
 @router.post("/{item_id}/predict-category")

@@ -15,6 +15,7 @@ class ClothingCreate(BaseModel):
     is_dirty: bool = False
     needs_ironing: bool = False
     is_ironed: bool = False
+    temp_image: Optional[str] = Field(default=None, max_length=100)
 
 
 class ClothingUpdate(BaseModel):
