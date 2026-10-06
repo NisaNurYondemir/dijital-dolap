@@ -8,6 +8,8 @@ from schemas.clothing import ClothingCreate, ClothingUpdate, ClothingOut
 import logging
 import uuid
 from pathlib import Path
+from io import BytesIO
+from PIL import Image, UnidentifiedImageError
 import logging
 import uuid
 from pathlib import Path
@@ -22,6 +24,17 @@ logger = logging.getLogger(__name__)
 UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
+ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP"}
+
+
+def _detect_format(data: bytes):
+    """Dosyanın gerçek biçimini içeriğine bakarak bulur (başlığa güvenmez)."""
+    try:
+        with Image.open(BytesIO(data)) as img:
+            return img.format
+    except (UnidentifiedImageError, OSError):
+        return None
+
 router = APIRouter(prefix="/clothes", tags=["clothes"])
 
 # Veritabanında boş olamayan alanlar: PATCH ile null gönderilemez
@@ -160,12 +173,12 @@ def upload_clothing_image(
 ):
     item = get_owned_clothing(item_id, db, current_user)
 
-    if file.content_type not in ("image/jpeg", "image/png", "image/webp"):
-        raise HTTPException(415, "Desteklenmeyen dosya formatı. JPEG, PNG veya WEBP gönderin.")
-
     image_bytes = file.file.read(MAX_UPLOAD_BYTES + 1)
     if len(image_bytes) > MAX_UPLOAD_BYTES:
         raise HTTPException(413, "Dosya çok büyük (en fazla 10 MB)")
+    
+    if _detect_format(image_bytes) not in ALLOWED_FORMATS:
+        raise HTTPException(415, "Desteklenmeyen dosya formatı. JPEG, PNG veya WEBP gönderin.")
 
     try:
         result = process_clothing_image(image_bytes)
