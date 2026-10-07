@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:dijital_dolap/data/api_client.dart';
 import 'package:dijital_dolap/models/outfit.dart';
+import 'package:dijital_dolap/models/clothing_item.dart';
+import 'package:dijital_dolap/providers/outfit_provider.dart';
 import 'package:dijital_dolap/theme/app_theme.dart';
 
 class OutfitsScreen extends StatefulWidget {
@@ -9,41 +13,89 @@ class OutfitsScreen extends StatefulWidget {
   State<OutfitsScreen> createState() => _OutfitsScreenState();
 }
 
-class _OutfitsScreenState extends State<OutfitsScreen> {
-  // ⚠️ Şimdilik boş liste. Sonra provider'dan gelecek.
-  final List<Outfit> _outfits = [];
+class _OutfitsScreenState extends State<OutfitsScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabs;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabs = TabController(length: 2, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final p = context.read<OutfitProvider>();
+      p.loadSuggestions();
+      p.loadAll();
+    });
+  }
+
+  @override
+  void dispose() {
+    _tabs.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Kombinler')),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Kombin oluşturma ekranı yakında')),
-          );
-        },
-        icon: const Icon(Icons.add),
-        label: const Text(
-          'Kombin oluştur',
-          style: TextStyle(fontWeight: FontWeight.w700),
+      appBar: AppBar(
+        title: const Text('Kombinler'),
+        bottom: TabBar(
+          controller: _tabs,
+          tabs: const [
+            Tab(text: 'Öneriler'),
+            Tab(text: 'Kombinlerim'),
+          ],
         ),
       ),
-      body: _outfits.isEmpty
-          ? const Center(child: Text('Henüz kombin yok'))
-          : ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-              itemCount: _outfits.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 14),
-              itemBuilder: (context, i) => _OutfitCard(outfit: _outfits[i]),
-            ),
+      body: TabBarView(
+        controller: _tabs,
+        children: const [
+          _SuggestionsTab(),
+          _MyOutfitsTab(),
+        ],
+      ),
     );
   }
 }
 
-class _OutfitCard extends StatelessWidget {
-  const _OutfitCard({required this.outfit});
+// ── Öneriler sekmesi ──────────────────────────────────────────────────────────
 
+class _SuggestionsTab extends StatelessWidget {
+  const _SuggestionsTab();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.watch<OutfitProvider>();
+
+    if (p.loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (p.error != null) {
+      return Center(child: Text('Hata: ${p.error}'));
+    }
+    if (p.suggestions.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: Text(
+            'Öneri üretmek için dolabında en az bir üst ve bir alt giysi olmalı.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+      itemCount: p.suggestions.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 14),
+      itemBuilder: (context, i) => _SuggestionCard(outfit: p.suggestions[i]),
+    );
+  }
+}
+
+class _SuggestionCard extends StatelessWidget {
+  const _SuggestionCard({required this.outfit});
   final Outfit outfit;
 
   @override
@@ -58,56 +110,188 @@ class _OutfitCard extends StatelessWidget {
         border: Border.all(color: AppColors.line),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              for (var i = 0; i < outfit.clothes.length; i++)
-                Expanded(
-                  child: Container(
-                    height: 84,
-                    margin: EdgeInsets.only(
-                      right: i == outfit.clothes.length - 1 ? 0 : 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: outfit.clothes[i].color ?? AppColors.line,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Icon(
-                      Icons.checkroom,
-                      color: ThemeData.estimateBrightnessForColor(
-                                  outfit.clothes[i].color ?? AppColors.line) ==
-                              Brightness.light
-                          ? AppColors.ink
-                          : Colors.white,
-                    ),
-                  ),
-                ),
-            ],
+          // Kıyafet görselleri
+          SizedBox(
+            height: 100,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: outfit.clothes.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, i) => _ClothingThumb(item: outfit.clothes[i]),
+            ),
+          ),
+          const SizedBox(height: 10),
+          // Uyum skoru
+          if (outfit.scoreLabel.isNotEmpty)
+            Text(outfit.scoreLabel,
+                style: text.bodySmall
+                    ?.copyWith(color: AppColors.thread, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          // Kaydet butonu
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _save(context),
+              icon: const Icon(Icons.bookmark_add_outlined, size: 18),
+              label: const Text('Kombini Kaydet'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _save(BuildContext context) async {
+    final ids = outfit.clothes.map((c) => c.id).toList();
+    try {
+      await context.read<OutfitProvider>().saveOutfit(ids);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Kombin kaydedildi!')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Hata: $e')),
+        );
+      }
+    }
+  }
+}
+
+// ── Kombinlerim sekmesi ───────────────────────────────────────────────────────
+
+class _MyOutfitsTab extends StatelessWidget {
+  const _MyOutfitsTab();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.watch<OutfitProvider>();
+
+    if (p.loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (p.outfits.isEmpty) {
+      return const Center(child: Text('Henüz kaydedilmiş kombin yok.'));
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+      itemCount: p.outfits.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 14),
+      itemBuilder: (context, i) => _SavedOutfitCard(outfit: p.outfits[i]),
+    );
+  }
+}
+
+class _SavedOutfitCard extends StatelessWidget {
+  const _SavedOutfitCard({required this.outfit});
+  final Outfit outfit;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final p = context.read<OutfitProvider>();
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: 100,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: outfit.clothes.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, i) => _ClothingThumb(item: outfit.clothes[i]),
+            ),
           ),
           const SizedBox(height: 10),
           Row(
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(outfit.displayName, style: text.titleMedium),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${outfit.clothes.length} parça',
-                      style: text.bodySmall,
-                    ),
-                  ],
-                ),
+                child: Text(outfit.displayName, style: text.titleMedium),
               ),
-              Icon(
-                outfit.isFavorite ? Icons.favorite : Icons.favorite_border,
-                color: outfit.isFavorite ? Colors.redAccent : AppColors.slate,
+              // Favori
+              IconButton(
+                icon: Icon(
+                  outfit.isFavorite ? Icons.favorite : Icons.favorite_border,
+                  color: outfit.isFavorite ? Colors.redAccent : AppColors.slate,
+                ),
+                onPressed: () => p.toggleFavorite(outfit),
+              ),
+              // Giydim
+              IconButton(
+                icon: const Icon(Icons.check_circle_outline),
+                color: AppColors.slate,
+                onPressed: () async {
+                  if (outfit.id != null) await p.logWear(outfit.id!);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Giyim kaydedildi!')),
+                    );
+                  }
+                },
+              ),
+              // Sil
+              IconButton(
+                icon: const Icon(Icons.delete_outline),
+                color: AppColors.slate,
+                onPressed: () async {
+                  if (outfit.id != null) await p.deleteOutfit(outfit.id!);
+                },
               ),
             ],
           ),
         ],
       ),
+    );
+  }
+}
+
+// ── Ortak küçük görsel ────────────────────────────────────────────────────────
+
+class _ClothingThumb extends StatelessWidget {
+  const _ClothingThumb({required this.item});
+  final ClothingItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = item.imagePath != null
+        ? item.imageUrlFor(ApiClient.baseUrl)
+        : null;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        width: 80,
+        height: 100,
+        child: url != null
+            ? Image.network(
+                url,
+                fit: BoxFit.cover,
+                loadingBuilder: (_, child, progress) =>
+                    progress == null ? child : const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                errorBuilder: (_, __, ___) => _placeholder(item.color),
+              )
+            : _placeholder(item.color),
+      ),
+    );
+  }
+
+  Widget _placeholder(Color? color) {
+    return Container(
+      color: color ?? AppColors.line,
+      child: const Icon(Icons.checkroom, color: Colors.white54),
     );
   }
 }
