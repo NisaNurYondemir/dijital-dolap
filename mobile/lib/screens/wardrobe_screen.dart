@@ -4,6 +4,7 @@ import 'package:dijital_dolap/models/clothing_item.dart';
 import 'package:dijital_dolap/providers/clothing_provider.dart';
 import 'package:dijital_dolap/widgets/clothing_card.dart';
 import 'package:dijital_dolap/screens/add_clothing_screen.dart';
+import 'package:dijital_dolap/models/clothing_categories.dart';
 
 class WardrobeScreen extends StatefulWidget {
   const WardrobeScreen({super.key});
@@ -25,11 +26,11 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
   }
 
   List<String> _categories(List<ClothingItem> items) {
-    final set = <String>{};
-    for (final i in items) {
-      set.add(i.category);
-    }
-    return set.toList()..sort();
+    final present = items.map((i) => i.category).toSet();
+    final known = kCategoryLabels.keys.where(present.contains);
+    final others = present.difference(kCategoryLabels.keys.toSet()).toList()
+      ..sort();
+    return [...known, ...others];
   }
 
   @override
@@ -43,12 +44,12 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Dolabım')),
             floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final result = await Navigator.of(context).push<bool>(
+        heroTag: 'wardrobe_fab',
+        onPressed: () {
+          Navigator.of(context).push<bool>(
             MaterialPageRoute(builder: (_) => const AddClothingScreen()),
           );
-          // result true ise liste zaten provider'da güncellendi
-          // ekstra bir şey yapmaya gerek yok
+          // Liste provider'da zaten güncelleniyor
         },
         child: const Icon(Icons.add),
       ),
@@ -79,7 +80,7 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
                           _chip('Tümü', _selectedCategory == null,
                               () => setState(() => _selectedCategory = null)),
                           for (final c in _categories(all))
-                            _chip(c, _selectedCategory == c,
+                            _chip(categoryLabel(c), _selectedCategory == c,
                                 () => setState(() => _selectedCategory = c)),
                         ],
                       ),

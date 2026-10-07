@@ -77,8 +77,8 @@ class ClothingItem {
   /// Görsel URL'i (backend /uploads altında servis ediyor)
   String? imageUrlFor(String baseUrl) {
     if (imagePath == null) return null;
-    // image_path "uploads/xxx.png" formatında
-    return '$baseUrl/$imagePath';
+    final p = imagePath!.replaceAll('\\', '/');
+    return '$baseUrl/${p.startsWith('/') ? p.substring(1) : p}';
   }
 
   /// HSL'den Flutter Color'a çevir (hue 0-360, s 0-100, l 0-100)
