@@ -1,27 +1,60 @@
 import 'package:flutter/material.dart';
-import 'package:dijital_dolap/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:dijital_dolap/providers/auth_provider.dart';
+import 'package:dijital_dolap/providers/clothing_provider.dart';
+import 'package:dijital_dolap/theme/app_theme.dart';
 
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
-  @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
-}
-
-class _ProfileScreenState extends State<ProfileScreen> {
-  bool _notifications = true;
-  bool _darkMode = false; // Şimdilik sadece görsel, tema geçişi sonra bağlanır.
-
-  void _soon(String what) {
+  void _soon(BuildContext context, String what) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('$what yakında')),
     );
   }
 
+  Future<void> _logout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Çıkış yap'),
+        content: const Text('Hesabından çıkmak istediğine emin misin?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Vazgeç'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
+            child: const Text('Çıkış yap'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && context.mounted) {
+      // Önce önceki hesabın verisini temizle, sonra oturumu kapat
+      context.read<ClothingProvider>().clear();
+      await context.read<AuthProvider>().logout();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final user = context.watch<AuthProvider>().user;
+    final items = context.watch<ClothingProvider>().items;
+
+    final username = (user?['username'] ?? '').toString().trim();
+    final email = (user?['email'] ?? '').toString().trim();
+    final displayName = username.isNotEmpty
+        ? username
+        : (email.isNotEmpty ? email.split('@').first : 'Kullanıcı');
+    final initial = displayName.characters.first.toUpperCase();
+
+    final total = items.length;
+    final dirty = items.where((i) => i.isDirty).length;
+    final ironing = items.where((i) => i.needsIroning && !i.isIroned).length;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Profil')),
       body: ListView(
@@ -31,12 +64,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _Panel(
             child: Row(
               children: [
-                const CircleAvatar(
+                CircleAvatar(
                   radius: 32,
                   backgroundColor: AppColors.thread,
                   child: Text(
-                    'N',
-                    style: TextStyle(
+                    initial,
+                    style: const TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.w800,
                       color: AppColors.ink,
@@ -49,74 +82,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Nisa Nur',
+                        displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: Theme.of(context)
                             .textTheme
                             .titleMedium
                             ?.copyWith(fontSize: 18),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'nisa@ornek.com',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
+                      if (email.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          email,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ],
                     ],
                   ),
-                ),
-                IconButton(
-                  onPressed: () => _soon('Profil düzenleme'),
-                  icon: const Icon(Icons.edit_outlined, color: AppColors.ink),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 14),
 
-          // İstatistikler
-          const Row(
+          // İstatistikler (gerçek veri)
+          Row(
             children: [
-              Expanded(child: _Stat(value: '8', label: 'Parça')),
-              SizedBox(width: 12),
-              Expanded(child: _Stat(value: '3', label: 'Kombin')),
-              SizedBox(width: 12),
-              Expanded(child: _Stat(value: '1', label: 'Favori')),
+              Expanded(child: _Stat(value: '$total', label: 'Parça')),
+              const SizedBox(width: 12),
+              Expanded(child: _Stat(value: '$dirty', label: 'Kirli')),
+              const SizedBox(width: 12),
+              Expanded(child: _Stat(value: '$ironing', label: 'Ütü bekleyen')),
             ],
-          ),
-          const SizedBox(height: 24),
-
-          const _SectionTitle('Tercihler'),
-          _Panel(
-            padding: EdgeInsets.zero,
-            child: Column(
-              children: [
-                SwitchListTile(
-                  value: _notifications,
-                  onChanged: (v) => setState(() => _notifications = v),
-                  secondary: const Icon(
-                    Icons.notifications_none,
-                    color: AppColors.ink,
-                  ),
-                  title: const Text('Bildirimler'),
-                ),
-                const Divider(height: 1, color: AppColors.line),
-                SwitchListTile(
-                  value: _darkMode,
-                  onChanged: (v) => setState(() => _darkMode = v),
-                  secondary: const Icon(
-                    Icons.dark_mode_outlined,
-                    color: AppColors.ink,
-                  ),
-                  title: const Text('Karanlık tema'),
-                ),
-                const Divider(height: 1, color: AppColors.line),
-                _NavTile(
-                  icon: Icons.language,
-                  title: 'Dil',
-                  trailing: 'Türkçe',
-                  onTap: () => _soon('Dil seçimi'),
-                ),
-              ],
-            ),
           ),
           const SizedBox(height: 24),
 
@@ -128,43 +127,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _NavTile(
                   icon: Icons.lock_outline,
                   title: 'Şifre değiştir',
-                  onTap: () => _soon('Şifre değiştirme'),
+                  onTap: () => _soon(context, 'Şifre değiştirme'),
                 ),
                 const Divider(height: 1, color: AppColors.line),
                 _NavTile(
                   icon: Icons.help_outline,
                   title: 'Yardım ve destek',
-                  onTap: () => _soon('Yardım'),
+                  onTap: () => _soon(context, 'Yardım'),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 24),
 
-                    OutlinedButton.icon(
-            onPressed: () async {
-              final confirmed = await showDialog<bool>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('Çıkış yap'),
-                  content: const Text('Hesabından çıkmak istediğine emin misin?'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, false),
-                      child: const Text('Vazgeç'),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, true),
-                      style: TextButton.styleFrom(foregroundColor: Colors.redAccent),
-                      child: const Text('Çıkış yap'),
-                    ),
-                  ],
-                ),
-              );
-              if (confirmed == true && context.mounted) {
-                await context.read<AuthProvider>().logout();
-              }
-            },
+          OutlinedButton.icon(
+            onPressed: () => _logout(context),
             icon: const Icon(Icons.logout),
             label: const Text('Çıkış yap'),
             style: OutlinedButton.styleFrom(
@@ -194,13 +171,17 @@ class _Panel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: padding,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppColors.line),
       ),
-      child: child,
+      clipBehavior: Clip.antiAlias,
+      // Şeffaf Material: ListTile'ın dokunma efekti ve arka plan uyarısı için
+      child: Material(
+        type: MaterialType.transparency,
+        child: Padding(padding: padding, child: child),
+      ),
     );
   }
 }
@@ -226,7 +207,12 @@ class _Stat extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 2),
-          Text(label, style: Theme.of(context).textTheme.bodyMedium),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
         ],
       ),
     );
@@ -259,12 +245,10 @@ class _NavTile extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.onTap,
-    this.trailing,
   });
 
   final IconData icon;
   final String title;
-  final String? trailing;
   final VoidCallback onTap;
 
   @override
@@ -273,14 +257,7 @@ class _NavTile extends StatelessWidget {
       onTap: onTap,
       leading: Icon(icon, color: AppColors.ink),
       title: Text(title),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (trailing != null)
-            Text(trailing!, style: Theme.of(context).textTheme.bodyMedium),
-          const Icon(Icons.chevron_right, color: AppColors.slate),
-        ],
-      ),
+      trailing: const Icon(Icons.chevron_right, color: AppColors.slate),
     );
   }
 }

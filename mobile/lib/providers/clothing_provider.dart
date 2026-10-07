@@ -33,6 +33,14 @@ class ClothingProvider extends ChangeNotifier {
 
   Future<void> refresh() => loadAll();
 
+    /// Çıkışta çağrılır: önceki hesabın verisi bellekte kalmasın.
+  void clear() {
+    _items = [];
+    _error = null;
+    _loading = false;
+    notifyListeners();
+  }
+
     /// Yeni kıyafet ekle. Başarılıysa true döner.
   Future<bool> createItem(Map<String, dynamic> data) async {
     _error = null;
