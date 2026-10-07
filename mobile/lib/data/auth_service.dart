@@ -29,6 +29,17 @@ class AuthService {
     });
   }
 
+  /// Şifre değiştir
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await _api.post('/auth/change-password', body: {
+      'current_password': currentPassword,
+      'new_password': newPassword,
+      });
+  }
+
   /// Mevcut kullanıcı bilgisi
   Future<Map<String, dynamic>> me() async {
     final res = await _api.get('/auth/me');

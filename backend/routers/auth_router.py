@@ -17,6 +17,25 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+@router.post("/change-password", status_code=200)
+def change_password(
+    req: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not verify_password(req.current_password, current_user.hashed_password):
+        raise HTTPException(400, "Mevcut şifre hatalı")
+    if len(req.new_password) < 6:
+        raise HTTPException(400, "Yeni şifre en az 6 karakter olmalı")
+    if verify_password(req.new_password, current_user.hashed_password):
+        raise HTTPException(400, "Yeni şifre mevcut şifreyle aynı olamaz")
+    current_user.hashed_password = hash_password(req.new_password)
+    db.commit()
+    return {"message": "Şifre başarıyla değiştirildi"}
 # --- Endpoint'ler ---
 @router.post("/register", status_code=201)
 def register(req: RegisterRequest, db: Session = Depends(get_db)):

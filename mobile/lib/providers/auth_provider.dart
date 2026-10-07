@@ -85,4 +85,27 @@ class AuthProvider extends ChangeNotifier {
     _status = AuthStatus.unauthenticated;
     notifyListeners();
   }
+
+  Future<String?> changePassword({
+  required String currentPassword,
+  required String newPassword,
+}) async {
+  _loading = true;
+  _error = null;
+  notifyListeners();
+  try {
+    await _service.changePassword(
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+    );
+    return null; // başarılı, hata yok
+  } on ApiException catch (e) {
+    return e.message;
+  } catch (e) {
+    return 'Bağlantı hatası: $e';
+  } finally {
+    _loading = false;
+    notifyListeners();
+  }
+}
 }

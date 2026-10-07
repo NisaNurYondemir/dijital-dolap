@@ -39,6 +39,70 @@ class ProfileScreen extends StatelessWidget {
     }
   }
 
+  Future<void> _changePassword(BuildContext context) async {
+  final currentCtrl = TextEditingController();
+  final newCtrl = TextEditingController();
+  final confirmCtrl = TextEditingController();
+
+  await showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Şifre değiştir'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: currentCtrl,
+            obscureText: true,
+            decoration: const InputDecoration(labelText: 'Mevcut şifre'),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: newCtrl,
+            obscureText: true,
+            decoration: const InputDecoration(labelText: 'Yeni şifre'),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: confirmCtrl,
+            obscureText: true,
+            decoration: const InputDecoration(labelText: 'Yeni şifre tekrar'),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Vazgeç'),
+        ),
+        TextButton(
+          onPressed: () async {
+            if (newCtrl.text != confirmCtrl.text) {
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                const SnackBar(content: Text('Yeni şifreler eşleşmiyor')),
+              );
+              return;
+            }
+            final error = await ctx.read<AuthProvider>().changePassword(
+                  currentPassword: currentCtrl.text,
+                  newPassword: newCtrl.text,
+                );
+            if (!ctx.mounted) return;
+            Navigator.pop(ctx);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(error ?? 'Şifre başarıyla değiştirildi'),
+                backgroundColor: error != null ? Colors.redAccent : Colors.green,
+              ),
+            );
+          },
+          child: const Text('Kaydet'),
+        ),
+      ],
+    ),
+  );
+}
+
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().user;
@@ -127,8 +191,8 @@ class ProfileScreen extends StatelessWidget {
                 _NavTile(
                   icon: Icons.lock_outline,
                   title: 'Şifre değiştir',
-                  onTap: () => _soon(context, 'Şifre değiştirme'),
-                ),
+                  onTap: () => _changePassword(context),
+                  ),
                 const Divider(height: 1, color: AppColors.line),
                 _NavTile(
                   icon: Icons.help_outline,
