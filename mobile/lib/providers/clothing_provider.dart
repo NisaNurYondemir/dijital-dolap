@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:dijital_dolap/data/api_client.dart';
 import 'package:dijital_dolap/data/clothing_repository.dart';
 import 'package:dijital_dolap/models/clothing_item.dart';
+import 'package:dijital_dolap/models/analysis_result.dart';
 
 class ClothingProvider extends ChangeNotifier {
   final _repo = ClothingRepository();
@@ -98,6 +99,64 @@ class ClothingProvider extends ChangeNotifier {
       return item;
     } on ApiException catch (e) {
       _error = e.message;
+      notifyListeners();
+      return null;
+    } catch (e) {
+      _error = 'Bağlantı hatası: $e';
+      notifyListeners();
+      return null;
+    }
+  }
+
+    /// Fotoğrafı kayıt açmadan analiz et. Başarısızsa null döner.
+  Future<AnalysisResult?> analyzeImage(List<int> bytes, String filename) async {
+    _error = null;
+    notifyListeners();
+    try {
+      return await _repo.analyze(bytes, filename);
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return null;
+    } catch (e) {
+      _error = 'Bağlantı hatası: $e';
+      notifyListeners();
+      return null;
+    }
+  }
+
+  /// Analiz sonucunu (kullanıcının düzelttiği değerlerle) tek POST ile kaydet.
+  Future<ClothingItem?> createFromAnalysis({
+    required AnalysisResult analysis,
+    required String category,
+    required String season,
+    String? colorName,
+    bool isDirty = false,
+    bool needsIroning = false,
+    bool isIroned = false,
+  }) async {
+    _error = null;
+    notifyListeners();
+    try {
+      final item = await _repo.create({
+        'category': category,
+        'season': season,
+        'color_name': colorName,
+        'hue': analysis.hue,
+        'saturation': analysis.saturation,
+        'lightness': analysis.lightness,
+        'is_dirty': isDirty,
+        'needs_ironing': needsIroning,
+        'is_ironed': isIroned,
+        'temp_image': analysis.tempImage,
+      });
+      _items = [..._items, item];
+      notifyListeners();
+      return item;
+    } on ApiException catch (e) {
+      _error = e.statusCode == 410
+          ? 'Fotoğrafın süresi doldu, lütfen tekrar seç.'
+          : e.message;
       notifyListeners();
       return null;
     } catch (e) {
