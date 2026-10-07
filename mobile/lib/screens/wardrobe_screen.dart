@@ -4,6 +4,7 @@ import 'package:dijital_dolap/models/clothing_item.dart';
 import 'package:dijital_dolap/providers/clothing_provider.dart';
 import 'package:dijital_dolap/widgets/clothing_card.dart';
 import 'package:dijital_dolap/screens/add_clothing_screen.dart';
+import 'package:dijital_dolap/screens/edit_clothing_screen.dart';
 import 'package:dijital_dolap/models/clothing_categories.dart';
 
 class WardrobeScreen extends StatefulWidget {
@@ -37,13 +38,18 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
   Widget build(BuildContext context) {
     final provider = context.watch<ClothingProvider>();
     final all = provider.items;
-    final items = _selectedCategory == null
+    // Seçili kategoride parça kalmadıysa (düzenleme/silme sonrası) Tümü'ne dön
+    final selected =
+        _selectedCategory != null && all.any((i) => i.category == _selectedCategory)
+            ? _selectedCategory
+            : null;
+    final items = selected == null
         ? all
-        : all.where((i) => i.category == _selectedCategory).toList();
+        : all.where((i) => i.category == selected).toList();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Dolabım')),
-            floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton(
         heroTag: 'wardrobe_fab',
         onPressed: () {
           Navigator.of(context).push<bool>(
@@ -77,10 +83,10 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         children: [
-                          _chip('Tümü', _selectedCategory == null,
+                          _chip('Tümü', selected == null,
                               () => setState(() => _selectedCategory = null)),
                           for (final c in _categories(all))
-                            _chip(categoryLabel(c), _selectedCategory == c,
+                            _chip(categoryLabel(c), selected == c,
                                 () => setState(() => _selectedCategory = c)),
                         ],
                       ),
@@ -113,8 +119,15 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
                                   childAspectRatio: 0.78,
                                 ),
                                 itemCount: items.length,
-                                itemBuilder: (context, i) =>
-                                    ClothingCard(item: items[i]),
+                                itemBuilder: (context, i) => ClothingCard(
+                                  item: items[i],
+                                  onTap: () => Navigator.of(context).push<bool>(
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          EditClothingScreen(item: items[i]),
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                     ),

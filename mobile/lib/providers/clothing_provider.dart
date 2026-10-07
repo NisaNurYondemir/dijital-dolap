@@ -33,7 +33,7 @@ class ClothingProvider extends ChangeNotifier {
 
   Future<void> refresh() => loadAll();
 
-    /// Çıkışta çağrılır: önceki hesabın verisi bellekte kalmasın.
+  /// Çıkışta çağrılır: önceki hesabın verisi bellekte kalmasın.
   void clear() {
     _items = [];
     _error = null;
@@ -41,7 +41,7 @@ class ClothingProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-    /// Yeni kıyafet ekle. Başarılıysa true döner.
+  /// Yeni kıyafet ekle. Başarılıysa true döner.
   Future<bool> createItem(Map<String, dynamic> data) async {
     _error = null;
     notifyListeners();
@@ -60,7 +60,8 @@ class ClothingProvider extends ChangeNotifier {
       return false;
     }
   }
-    /// Kıyafeti fotoğrafla birlikte oluştur.
+
+  /// Kıyafeti fotoğrafla birlikte oluştur.
   /// 1) POST /clothes (category: "unknown")
   /// 2) POST /clothes/{id}/image (fotoğraf)
   /// 3) POST /clothes/{id}/predict-category (kategori tahmini)
@@ -116,7 +117,7 @@ class ClothingProvider extends ChangeNotifier {
     }
   }
 
-    /// Fotoğrafı kayıt açmadan analiz et. Başarısızsa null döner.
+  /// Fotoğrafı kayıt açmadan analiz et. Başarısızsa null döner.
   Future<AnalysisResult?> analyzeImage(List<int> bytes, String filename) async {
     _error = null;
     notifyListeners();
@@ -174,6 +175,43 @@ class ClothingProvider extends ChangeNotifier {
     }
   }
 
+  /// Var olan kıyafetin bilgilerini güncelle (PATCH). Başarısızsa null döner.
+  Future<ClothingItem?> updateItem(int id, Map<String, dynamic> data) async {
+    _error = null;
+    notifyListeners();
+    try {
+      final updated = await _repo.update(id, data);
+      _items = [for (final i in _items) i.id == id ? updated : i];
+      notifyListeners();
+      return updated;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return null;
+    } catch (e) {
+      _error = 'Bağlantı hatası: $e';
+      notifyListeners();
+      return null;
+    }
+  }
 
-
+  /// Kıyafeti sil. Başarılıysa true döner.
+  Future<bool> deleteItem(int id) async {
+    _error = null;
+    notifyListeners();
+    try {
+      await _repo.delete(id);
+      _items = _items.where((i) => i.id != id).toList();
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _error = 'Bağlantı hatası: $e';
+      notifyListeners();
+      return false;
+    }
+  }
 }
