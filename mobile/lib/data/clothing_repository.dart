@@ -1,5 +1,6 @@
 import 'package:dijital_dolap/data/api_client.dart';
 import 'package:dijital_dolap/models/clothing_item.dart';
+import 'package:dijital_dolap/models/analysis_result.dart';
 
 class ClothingRepository {
   final _api = ApiClient.instance;
@@ -19,8 +20,7 @@ class ClothingRepository {
 
     final qs = query.isEmpty
         ? ''
-        : '?' + query.entries.map((e) => '${e.key}=${e.value}').join('&');
-
+        : '?${query.entries.map((e) => '${e.key}=${e.value}').join('&')}';
     final res = await _api.get('/clothes/$qs');
     if (res is! List) return [];
     return res
@@ -63,6 +63,15 @@ class ClothingRepository {
     final res = await _api.post('/clothes/$id/predict-category');
     return res['category'] as String;
   }
-
+    /// Kayıt açmadan fotoğrafı analiz et (arka plan sil, renk, kategori adayları)
+  Future<AnalysisResult> analyze(List<int> bytes, String filename) async {
+    final res = await _api.uploadFile(
+      '/clothes/analyze',
+      'file',
+      bytes,
+      filename,
+    );
+    return AnalysisResult.fromJson(res as Map<String, dynamic>);
+  }
 
 }
