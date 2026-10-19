@@ -24,6 +24,12 @@ def test_group_of_normalizes_names():
     assert group_of("şapka") is None
 
 
+def test_new_clip_categories_are_mapped():
+    # CLIP bu iki kategoriyi tahmin edebiliyor; öneri motoru da tanımalı.
+    assert group_of("hoodie") == "ust"
+    assert group_of("takim elbise") == "elbise"
+
+
 def test_best_combination_first():
     red_top = item("tshirt", hue=0)
     black_pants = item("pantolon", hue=0, sat=0, light=5)   # nötr -> 1.0

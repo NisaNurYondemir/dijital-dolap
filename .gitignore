@@ -14,3 +14,10 @@ venv/
 # Kullanıcı yüklemeleri ve test çıktıları
 backend/uploads/
 backend/test_output.png
+
+# Veri setleri ve eğitilmiş modeller (repoda tutulmaz)
+datasets/
+models/
+*.pt
+*.pth
+*.onnx

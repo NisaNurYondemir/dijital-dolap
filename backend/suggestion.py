@@ -11,9 +11,9 @@ MAX_PER_GROUP = 40   # her gruptan en fazla bu kadar parça değerlendirilir
 # karakter ve - _ boşluk yok). Kendi kategorilerini buraya ekleyebilirsin.
 CATEGORY_GROUPS = {
     "ust": {"tshirt", "tisort", "gomlek", "bluz", "kazak", "sweatshirt",
-            "polo", "atlet", "body", "top"},
+            "polo", "atlet", "body", "top", "hoodie", "kapusonlu"},
     "alt": {"pantolon", "jean", "kot", "etek", "sort", "tayt", "esofman"},
-    "elbise": {"elbise", "tulum", "dress"},
+    "elbise": {"elbise", "tulum", "dress", "takimelbise"},
     "dis": {"ceket", "mont", "kaban", "hirka", "blazer", "trenckot", "yelek"},
     "ayakkabi": {"ayakkabi", "sneaker", "bot", "cizme", "sandalet",
                  "terlik", "topuklu"},
