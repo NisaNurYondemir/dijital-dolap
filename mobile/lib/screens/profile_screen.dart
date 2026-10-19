@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:dijital_dolap/providers/auth_provider.dart';
 import 'package:dijital_dolap/providers/clothing_provider.dart';
+import 'package:dijital_dolap/providers/outfit_provider.dart';
 import 'package:dijital_dolap/theme/app_theme.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -35,6 +36,7 @@ class ProfileScreen extends StatelessWidget {
     if (confirmed == true && context.mounted) {
       // Önce önceki hesabın verisini temizle, sonra oturumu kapat
       context.read<ClothingProvider>().clear();
+      context.read<OutfitProvider>().clear();
       await context.read<AuthProvider>().logout();
     }
   }

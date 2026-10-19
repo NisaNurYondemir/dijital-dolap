@@ -19,6 +19,9 @@ class ApiClient {
   static const _tokenKey = 'auth_token';
   String? _token;
 
+  /// 401 alındığında çağrılır (token süresi dolmuşsa oturumu kapatmak için).
+  void Function()? onUnauthorized;
+
   /// Platforma göre base URL
   static String get baseUrl {
     if (kIsWeb) return 'http://localhost:8000';
@@ -137,6 +140,11 @@ class ApiClient {
     if (res.statusCode >= 200 && res.statusCode < 300) {
       if (res.body.isEmpty) return null;
       return jsonDecode(utf8.decode(res.bodyBytes));
+    }
+
+    // Token geçersiz/süresi dolmuş: oturumu kapat (giriş isteğinde token yoktur).
+    if (res.statusCode == 401 && hasToken) {
+      onUnauthorized?.call();
     }
 
     String detail = 'Bilinmeyen hata';

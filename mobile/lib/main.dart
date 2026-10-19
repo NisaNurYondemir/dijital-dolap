@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:dijital_dolap/data/api_client.dart';
 import 'package:dijital_dolap/providers/auth_provider.dart';
 import 'package:dijital_dolap/providers/clothing_provider.dart';
 import 'package:dijital_dolap/providers/outfit_provider.dart';
@@ -11,16 +12,53 @@ void main() {
   runApp(const DijitalDolapApp());
 }
 
-class DijitalDolapApp extends StatelessWidget {
+class DijitalDolapApp extends StatefulWidget {
   const DijitalDolapApp({super.key});
+
+  @override
+  State<DijitalDolapApp> createState() => _DijitalDolapAppState();
+}
+
+class _DijitalDolapAppState extends State<DijitalDolapApp> {
+  late final AuthProvider _auth;
+  late final ClothingProvider _clothing;
+  late final OutfitProvider _outfits;
+
+  @override
+  void initState() {
+    super.initState();
+    _auth = AuthProvider();
+    _clothing = ClothingProvider();
+    _outfits = OutfitProvider();
+
+    // Token süresi dolunca (401) oturumu ve önceki hesabın verisini temizle.
+    ApiClient.instance.onUnauthorized = _handleUnauthorized;
+    _auth.bootstrap();
+  }
+
+  void _handleUnauthorized() {
+    if (_auth.status != AuthStatus.authenticated) return;
+    _clothing.clear();
+    _outfits.clear();
+    _auth.logout();
+  }
+
+  @override
+  void dispose() {
+    ApiClient.instance.onUnauthorized = null;
+    _auth.dispose();
+    _clothing.dispose();
+    _outfits.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()..bootstrap()),
-        ChangeNotifierProvider(create: (_) => ClothingProvider()),
-        ChangeNotifierProvider(create: (_) => OutfitProvider()),
+        ChangeNotifierProvider.value(value: _auth),
+        ChangeNotifierProvider.value(value: _clothing),
+        ChangeNotifierProvider.value(value: _outfits),
       ],
       child: MaterialApp(
         title: 'Dijital Dolap',
