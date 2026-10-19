@@ -61,62 +61,6 @@ class ClothingProvider extends ChangeNotifier {
     }
   }
 
-  /// Kıyafeti fotoğrafla birlikte oluştur.
-  /// 1) POST /clothes (category: "unknown")
-  /// 2) POST /clothes/{id}/image (fotoğraf)
-  /// 3) POST /clothes/{id}/predict-category (kategori tahmini)
-  /// Başarılıysa güncel ClothingItem döner.
-  Future<ClothingItem?> createWithImage({
-    required String season,
-    String? colorName,
-    required List<int> imageBytes,
-    required String filename,
-    bool isDirty = false,
-    bool needsIroning = false,
-    bool isIroned = false,
-  }) async {
-    _error = null;
-    notifyListeners();
-    try {
-      // 1) Item oluştur
-      var item = await _repo.create({
-        'category': 'unknown',
-        'season': season,
-        'color_name': colorName,
-        'is_dirty': isDirty,
-        'needs_ironing': needsIroning,
-        'is_ironed': isIroned,
-      });
-
-      // 2) Fotoğraf yükle (backend rengi çıkarır)
-      item = await _repo.uploadImage(item.id, imageBytes, filename);
-
-      // 3) Kategori tahmini yap
-      try {
-        final predicted = await _repo.predictCategory(item.id);
-        // Tahmin edilen kategoriyi item'a yansıtmak için tekrar getir
-        item = await _repo.getById(item.id);
-        // predicted değişkeni log için gerekli olabilir ama item zaten güncel
-        debugPrint('Kategori tahmini: $predicted');
-      } catch (e) {
-        // Tahmin başarısız olsa bile item eklensin
-        debugPrint('Kategori tahmini başarısız: $e');
-      }
-
-      _items = [..._items, item];
-      notifyListeners();
-      return item;
-    } on ApiException catch (e) {
-      _error = e.message;
-      notifyListeners();
-      return null;
-    } catch (e) {
-      _error = 'Bağlantı hatası: $e';
-      notifyListeners();
-      return null;
-    }
-  }
-
   /// Fotoğrafı kayıt açmadan analiz et. Başarısızsa null döner.
   Future<AnalysisResult?> analyzeImage(List<int> bytes, String filename) async {
     _error = null;
