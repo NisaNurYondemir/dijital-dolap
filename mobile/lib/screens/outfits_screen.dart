@@ -88,7 +88,7 @@ class _SuggestionsTab extends StatelessWidget {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
       itemCount: p.suggestions.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 14),
+      separatorBuilder: (_, _) => const SizedBox(height: 14),
       itemBuilder: (context, i) => _SuggestionCard(outfit: p.suggestions[i]),
     );
   }
@@ -118,7 +118,7 @@ class _SuggestionCard extends StatelessWidget {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: outfit.clothes.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
               itemBuilder: (_, i) => _ClothingThumb(item: outfit.clothes[i]),
             ),
           ),
@@ -181,7 +181,7 @@ class _MyOutfitsTab extends StatelessWidget {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
       itemCount: p.outfits.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 14),
+      separatorBuilder: (_, _) => const SizedBox(height: 14),
       itemBuilder: (context, i) => _SavedOutfitCard(outfit: p.outfits[i]),
     );
   }
@@ -211,7 +211,7 @@ class _SavedOutfitCard extends StatelessWidget {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: outfit.clothes.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
               itemBuilder: (_, i) => _ClothingThumb(item: outfit.clothes[i]),
             ),
           ),
@@ -281,7 +281,7 @@ class _ClothingThumb extends StatelessWidget {
                 fit: BoxFit.cover,
                 loadingBuilder: (_, child, progress) =>
                     progress == null ? child : const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                errorBuilder: (_, __, ___) => _placeholder(item.color),
+                errorBuilder: (_, _, _) => _placeholder(item.color),
               )
             : _placeholder(item.color),
       ),

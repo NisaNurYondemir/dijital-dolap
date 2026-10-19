@@ -1,29 +1,5 @@
 import 'package:flutter/material.dart';
 
-enum ClothingCategory {
-  top('Üst', Icons.checkroom),
-  bottom('Alt', Icons.dry_cleaning),
-  dress('Elbise', Icons.woman),
-  outerwear('Dış giyim', Icons.layers),
-  shoes('Ayakkabı', Icons.directions_walk),
-  accessory('Aksesuar', Icons.watch);
-
-  const ClothingCategory(this.label, this.icon);
-  final String label;
-  final IconData icon;
-
-  // Backend'den gelen string'i enum'a çevir
-  static ClothingCategory? fromString(String? value) {
-    if (value == null) return null;
-    // Türkçe karakter + büyük/küçük harf toleransı
-    final v = value.toLowerCase().trim();
-    for (final c in ClothingCategory.values) {
-      if (c.label.toLowerCase() == v) return c;
-    }
-    return null;
-  }
-}
-
 class ClothingItem {
   final int id;                    // backend int
   final int userId;
