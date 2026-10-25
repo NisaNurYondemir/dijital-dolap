@@ -39,6 +39,7 @@ class WearProvider extends ChangeNotifier {
     List<int>? clothingIds,
     int? rating,
     String? occasion,
+    int? occasionGroupId,
     String? note,
   }) async {
     try {
@@ -47,6 +48,7 @@ class WearProvider extends ChangeNotifier {
         clothingIds: clothingIds,
         rating: rating,
         occasion: occasion,
+        occasionGroupId: occasionGroupId,
         note: note,
       );
       _entries.insert(0, entry);
@@ -64,6 +66,7 @@ class WearProvider extends ChangeNotifier {
     WearEntry entry, {
     int? rating,
     String? occasion,
+    int? occasionGroupId,
     String? note,
   }) async {
     try {
@@ -71,6 +74,7 @@ class WearProvider extends ChangeNotifier {
         entry.id,
         rating: rating,
         occasion: occasion,
+        occasionGroupId: occasionGroupId,
         note: note,
       );
       final i = _entries.indexWhere((e) => e.id == entry.id);

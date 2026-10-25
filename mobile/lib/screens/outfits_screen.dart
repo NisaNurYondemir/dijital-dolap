@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:dijital_dolap/models/occasion_group.dart';
 import 'package:dijital_dolap/models/outfit.dart';
+import 'package:dijital_dolap/providers/occasion_provider.dart';
 import 'package:dijital_dolap/providers/outfit_provider.dart';
 import 'package:dijital_dolap/providers/wear_provider.dart';
 import 'package:dijital_dolap/theme/app_theme.dart';
 import 'package:dijital_dolap/widgets/clothing_thumb.dart';
+import 'package:dijital_dolap/widgets/occasion_picker_sheet.dart';
 import 'package:dijital_dolap/widgets/wear_feedback_sheet.dart';
 
 class OutfitsScreen extends StatefulWidget {
@@ -147,12 +150,17 @@ class _SuggestionCard extends StatelessWidget {
   Future<void> _save(BuildContext context) async {
     final ids = outfit.clothes.map((c) => c.id).toList();
     try {
-      await context.read<OutfitProvider>().saveOutfit(ids);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Kombin kaydedildi!')),
-        );
-      }
+      final created = await context.read<OutfitProvider>().saveOutfit(ids);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Kombin kaydedildi!'),
+          action: SnackBarAction(
+            label: 'Grupla',
+            onPressed: () => showOccasionPicker(context, created),
+          ),
+        ),
+      );
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -165,25 +173,83 @@ class _SuggestionCard extends StatelessWidget {
 
 // ── Kombinlerim sekmesi ───────────────────────────────────────────────────────
 
-class _MyOutfitsTab extends StatelessWidget {
+class _MyOutfitsTab extends StatefulWidget {
   const _MyOutfitsTab();
+
+  @override
+  State<_MyOutfitsTab> createState() => _MyOutfitsTabState();
+}
+
+class _MyOutfitsTabState extends State<_MyOutfitsTab> {
+  int? _selectedGroupId;
 
   @override
   Widget build(BuildContext context) {
     final p = context.watch<OutfitProvider>();
+    final groups = context.watch<OccasionProvider>().groups;
 
-    if (p.loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (p.outfits.isEmpty) {
-      return const Center(child: Text('Henüz kaydedilmiş kombin yok.'));
-    }
+    final selectedId = groups.any((g) => g.id == _selectedGroupId)
+        ? _selectedGroupId
+        : null;
+    final outfits = selectedId == null
+        ? p.outfits
+        : p.outfits
+            .where((o) => o.groups.any((g) => g.id == selectedId))
+            .toList();
 
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-      itemCount: p.outfits.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 14),
-      itemBuilder: (context, i) => _SavedOutfitCard(outfit: p.outfits[i]),
+    return Column(
+      children: [
+        if (groups.isNotEmpty)
+          SizedBox(
+            height: 52,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              itemCount: groups.length + 1,
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (context, i) {
+                if (i == 0) {
+                  return ChoiceChip(
+                    label: const Text('Tümü'),
+                    selected: selectedId == null,
+                    onSelected: (_) =>
+                        setState(() => _selectedGroupId = null),
+                  );
+                }
+                final group = groups[i - 1];
+                return ChoiceChip(
+                  label: Text(group.label),
+                  selected: selectedId == group.id,
+                  onSelected: (_) =>
+                      setState(() => _selectedGroupId = group.id),
+                );
+              },
+            ),
+          ),
+        Expanded(
+          child: p.loading && p.outfits.isEmpty
+              ? const Center(child: CircularProgressIndicator())
+              : outfits.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Text(
+                          selectedId == null
+                              ? 'Henüz kaydedilmiş kombin yok.'
+                              : 'Bu grupta kombin yok. Kartlardaki "Grupla" ile ekleyebilirsin.',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+                      itemCount: outfits.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 14),
+                      itemBuilder: (context, i) =>
+                          _SavedOutfitCard(outfit: outfits[i]),
+                    ),
+        ),
+      ],
     );
   }
 }
@@ -263,7 +329,50 @@ class _SavedOutfitCard extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 2),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              for (final group in outfit.groups)
+                _OutfitGroupChip(group: group),
+              ActionChip(
+                avatar: const Icon(Icons.local_offer_outlined, size: 15),
+                label: Text(
+                  outfit.groups.isEmpty ? 'Grupla' : 'Grupları düzenle',
+                ),
+                visualDensity: VisualDensity.compact,
+                onPressed: () => showOccasionPicker(context, outfit),
+              ),
+            ],
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _OutfitGroupChip extends StatelessWidget {
+  const _OutfitGroupChip({required this.group});
+
+  final OccasionGroup group;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: group.color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        group.label,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: AppColors.ink,
+        ),
       ),
     );
   }

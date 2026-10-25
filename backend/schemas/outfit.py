@@ -2,16 +2,19 @@ from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, ConfigDict
 from schemas.clothing import ClothingOut
+from schemas.occasion import OccasionGroupOut
 
 
 class OutfitCreate(BaseModel):
     clothing_ids: list[int]
     is_favorite: bool = False
+    occasion_ids: list[int] = []
 
 
 class OutfitUpdate(BaseModel):
     is_favorite: Optional[bool] = None
     clothing_ids: Optional[list[int]] = None
+    occasion_ids: Optional[list[int]] = None
 
 
 class OutfitOut(BaseModel):
@@ -22,6 +25,7 @@ class OutfitOut(BaseModel):
     is_favorite: bool
     created_at: datetime
     clothes: list[ClothingOut]
+    groups: list[OccasionGroupOut] = []
 
 class OutfitSuggestion(BaseModel):
     score: float

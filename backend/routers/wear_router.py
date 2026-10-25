@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from auth import get_db, get_current_user
 from models.clothing import Clothing
+from models.occasion import OccasionGroup
 from models.outfit import Outfit, WearHistory, wear_items
 from models.user import User
 from schemas.wear import WearCreate, WearOut, WearUpdate
@@ -80,11 +81,25 @@ def log_wear(
         req.outfit_id, req.clothing_ids, db, current_user
     )
 
+    group: Optional[OccasionGroup] = None
+    if req.occasion_group_id is not None:
+        group = (
+            db.query(OccasionGroup)
+            .filter(
+                OccasionGroup.id == req.occasion_group_id,
+                OccasionGroup.user_id == current_user.id,
+            )
+            .first()
+        )
+        if not group:
+            raise HTTPException(404, "Amaç grubu bulunamadı")
+
     entry = WearHistory(
         user_id=current_user.id,
         outfit_id=outfit.id if outfit else None,
         rating=req.rating,
-        occasion=req.occasion,
+        occasion=group.name if group else req.occasion,
+        occasion_group_id=group.id if group else None,
         note=req.note,
         weather_temp=req.weather_temp,
         weather_condition=req.weather_condition,
@@ -106,6 +121,7 @@ def list_wear_history(
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     occasion: Optional[str] = Query(None),
+    occasion_group_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -117,6 +133,10 @@ def list_wear_history(
     )
     if occasion is not None:
         query = query.filter(WearHistory.occasion == occasion)
+    if occasion_group_id is not None:
+        query = query.filter(
+            WearHistory.occasion_group_id == occasion_group_id
+        )
     return (
         query.order_by(WearHistory.worn_at.desc(), WearHistory.id.desc())
         .offset(offset)
@@ -206,6 +226,24 @@ def update_wear_entry(
     entry = get_owned_wear(entry_id, db, current_user)
 
     changes = req.model_dump(exclude_unset=True)
+    if "occasion_group_id" in changes:
+        group_id = changes.pop("occasion_group_id")
+        if group_id is None:
+            entry.occasion_group_id = None
+        else:
+            group = (
+                db.query(OccasionGroup)
+                .filter(
+                    OccasionGroup.id == group_id,
+                    OccasionGroup.user_id == current_user.id,
+                )
+                .first()
+            )
+            if not group:
+                raise HTTPException(404, "Amaç grubu bulunamadı")
+            entry.occasion_group_id = group.id
+            entry.occasion = group.name
+
     for field, value in changes.items():
         setattr(entry, field, value)
 

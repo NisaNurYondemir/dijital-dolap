@@ -1,11 +1,12 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from auth import get_db, get_current_user
 from color_engine import Color, score_outfit
 from models.clothing import Clothing
+from models.occasion import OccasionGroup
 from models.outfit import Outfit
 from models.user import User
 from schemas.clothing import ClothingOut, Season
@@ -14,10 +15,15 @@ from suggestion import suggest_outfits
 
 router = APIRouter(prefix="/outfits", tags=["outfits"])
 def get_owned_outfit(outfit_id: int, db: Session, user: User) -> Outfit:
-    outfit = db.query(Outfit).filter(
-        Outfit.id == outfit_id,
-        Outfit.user_id == user.id,
-    ).first()
+    outfit = (
+        db.query(Outfit)
+        .options(selectinload(Outfit.groups))
+        .filter(
+            Outfit.id == outfit_id,
+            Outfit.user_id == user.id,
+        )
+        .first()
+    )
     if not outfit:
         raise HTTPException(404, "Kombin bulunamadı")
     return outfit
@@ -34,6 +40,29 @@ def resolve_clothes(clothing_ids: list[int], db: Session, user: User) -> list[Cl
     return items
 
 
+def resolve_groups(
+    occasion_ids: list[int],
+    db: Session,
+    user: User,
+) -> list[OccasionGroup]:
+    """ID listesini kullanıcıya ait amaç gruplarına çevirir (sırayı korur)."""
+    ids = list(dict.fromkeys(occasion_ids))
+    if not ids:
+        return []
+    groups = (
+        db.query(OccasionGroup)
+        .filter(
+            OccasionGroup.id.in_(ids),
+            OccasionGroup.user_id == user.id,
+        )
+        .all()
+    )
+    if len(groups) != len(ids):
+        raise HTTPException(404, "Bir veya daha fazla amaç grubu bulunamadı")
+    by_id = {group.id: group for group in groups}
+    return [by_id[group_id] for group_id in ids]
+
+
 @router.post("/", response_model=OutfitOut, status_code=201)
 def create_outfit(
     req: OutfitCreate,
@@ -41,20 +70,32 @@ def create_outfit(
     current_user: User = Depends(get_current_user),
 ):
     clothes = resolve_clothes(req.clothing_ids, db, current_user)
+    groups = resolve_groups(req.occasion_ids, db, current_user)
     outfit = Outfit(user_id=current_user.id, is_favorite=req.is_favorite)
     outfit.clothes = clothes
+    outfit.groups = groups
     db.add(outfit)
     db.commit()
     db.refresh(outfit)
-    return outfit
+    return get_owned_outfit(outfit.id, db, current_user)
 
 
 @router.get("/", response_model=list[OutfitOut])
 def list_outfits(
+    occasion_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return db.query(Outfit).filter(Outfit.user_id == current_user.id).all()
+    query = (
+        db.query(Outfit)
+        .options(selectinload(Outfit.groups))
+        .filter(Outfit.user_id == current_user.id)
+    )
+    if occasion_id is not None:
+        query = query.join(Outfit.groups).filter(
+            OccasionGroup.id == occasion_id
+        )
+    return query.order_by(Outfit.created_at.desc(), Outfit.id.desc()).all()
 
 @router.get("/suggest", response_model=list[OutfitSuggestion])
 def suggest(
@@ -106,9 +147,12 @@ def update_outfit(
     if req.clothing_ids is not None:
         outfit.clothes = resolve_clothes(req.clothing_ids, db, current_user)
 
+    if req.occasion_ids is not None:
+        outfit.groups = resolve_groups(req.occasion_ids, db, current_user)
+
     db.commit()
     db.refresh(outfit)
-    return outfit
+    return get_owned_outfit(outfit.id, db, current_user)
 
 
 @router.delete("/{outfit_id}", status_code=204)

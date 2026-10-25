@@ -17,7 +17,6 @@ backend/test_output.png
 
 # Veri setleri ve eğitilmiş modeller (repoda tutulmaz)
 datasets/
-models/
 *.pt
 *.pth
 *.onnx

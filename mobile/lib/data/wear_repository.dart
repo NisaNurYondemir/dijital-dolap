@@ -17,6 +17,7 @@ class WearRepository {
     List<int>? clothingIds,
     int? rating,
     String? occasion,
+    int? occasionGroupId,
     String? note,
   }) async {
     final ids =
@@ -26,6 +27,7 @@ class WearRepository {
       'clothing_ids': ?ids,
       'rating': ?rating,
       'occasion': ?occasion,
+      'occasion_group_id': ?occasionGroupId,
       'note': ?note,
     });
     return WearEntry.fromJson(res as Map<String, dynamic>);
@@ -35,11 +37,13 @@ class WearRepository {
     int id, {
     int? rating,
     String? occasion,
+    int? occasionGroupId,
     String? note,
   }) async {
     final res = await _api.patch('/wear/$id', {
       'rating': ?rating,
       'occasion': ?occasion,
+      'occasion_group_id': ?occasionGroupId,
       'note': ?note,
     });
     return WearEntry.fromJson(res as Map<String, dynamic>);

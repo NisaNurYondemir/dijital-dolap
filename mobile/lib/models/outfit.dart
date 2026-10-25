@@ -1,10 +1,12 @@
 import 'package:dijital_dolap/models/clothing_item.dart';
+import 'package:dijital_dolap/models/occasion_group.dart';
 
 class Outfit {
   final int? id;
   final int? userId;
   final bool isFavorite;
   final List<ClothingItem> clothes;
+  final List<OccasionGroup> groups;
   final DateTime? createdAt;
   final double? score;
 
@@ -13,6 +15,7 @@ class Outfit {
     this.userId,
     this.isFavorite = false,
     required this.clothes,
+    this.groups = const [],
     this.createdAt,
     this.score,
   });
@@ -25,6 +28,9 @@ class Outfit {
       isFavorite: json['is_favorite'] as bool? ?? false,
       clothes: (json['clothes'] as List<dynamic>)
           .map((e) => ClothingItem.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      groups: (json['groups'] as List<dynamic>? ?? [])
+          .map((e) => OccasionGroup.fromJson(e as Map<String, dynamic>))
           .toList(),
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)

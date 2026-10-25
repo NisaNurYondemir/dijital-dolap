@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:dijital_dolap/models/wear_entry.dart';
+import 'package:dijital_dolap/providers/occasion_provider.dart';
 import 'package:dijital_dolap/providers/wear_provider.dart';
 import 'package:dijital_dolap/theme/app_theme.dart';
 import 'package:dijital_dolap/widgets/clothing_thumb.dart';
@@ -271,6 +272,10 @@ class _WearCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final group = context.watch<OccasionProvider>().byId(entry.occasionGroupId);
+    final occasionLabel = group?.label ?? entry.occasion;
+    final occasionColor = group?.color ?? AppColors.thread;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 8, 12),
       decoration: BoxDecoration(
@@ -289,17 +294,17 @@ class _WearCard extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
-              if (entry.occasion != null)
+              if (occasionLabel != null)
                 Container(
                   margin: const EdgeInsets.only(right: 4),
                   padding:
                       const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                   decoration: BoxDecoration(
-                    color: const Color(0x33F2B84B),
+                    color: occasionColor.withValues(alpha: 0.16),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    entry.occasion!,
+                    occasionLabel,
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,

@@ -9,17 +9,31 @@ class OutfitRepository {
     if (res is! List) return [];
     return res.map((e) => Outfit.fromJson(e as Map<String, dynamic>)).toList();
   }
-  
+
   Future<List<Outfit>> getSuggestions() async {
-  final res = await _api.get('/outfits/suggest');
-  if (res is! List) return [];
-  return res
-      .map((e) => Outfit.fromSuggestion(e as Map<String, dynamic>))
-      .toList();
+    final res = await _api.get('/outfits/suggest');
+    if (res is! List) return [];
+    return res
+        .map((e) => Outfit.fromSuggestion(e as Map<String, dynamic>))
+        .toList();
   }
 
-  Future<Outfit> create(List<int> clothingIds) async {
-    final res = await _api.post('/outfits/', body: {'clothing_ids': clothingIds});
+  Future<Outfit> create(
+    List<int> clothingIds, {
+    List<int> occasionIds = const [],
+  }) async {
+    final res = await _api.post('/outfits/', body: {
+      'clothing_ids': clothingIds,
+      if (occasionIds.isNotEmpty) 'occasion_ids': occasionIds,
+    });
+    return Outfit.fromJson(res as Map<String, dynamic>);
+  }
+
+  Future<Outfit> setOccasions(int id, List<int> occasionIds) async {
+    final res = await _api.patch(
+      '/outfits/$id',
+      {'occasion_ids': occasionIds},
+    );
     return Outfit.fromJson(res as Map<String, dynamic>);
   }
 

@@ -20,6 +20,25 @@ outfit_items = Table(
     Column("clothing_id", Integer, ForeignKey("clothes.id"),  primary_key=True),
 )
 
+# Outfits ↔ OccasionGroups arası many-to-many köprü tablosu.
+# Bir kombin birden fazla amaca hizmet edebilir (okul + günlük gibi).
+outfit_occasions = Table(
+    "outfit_occasions",
+    Base.metadata,
+    Column(
+        "outfit_id",
+        Integer,
+        ForeignKey("outfits.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "occasion_group_id",
+        Integer,
+        ForeignKey("occasion_groups.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+)
+
 # WearHistory ↔ Clothes arası many-to-many köprü tablosu.
 # Kombin kaydedilmemiş olsa bile tek tek parça giyimi kaydedilebilsin diye.
 wear_items = Table(
@@ -50,6 +69,11 @@ class Outfit(Base):
 
     owner    = relationship("User",     back_populates="outfits")
     clothes  = relationship("Clothing", secondary=outfit_items)
+    groups   = relationship(
+        "OccasionGroup",
+        secondary=outfit_occasions,
+        back_populates="outfits",
+    )
 
 
 class WearHistory(Base):
@@ -68,6 +92,11 @@ class WearHistory(Base):
     # Kullanıcı geri bildirimi
     rating     = Column(Integer, nullable=True)    # 1-5
     occasion   = Column(String, nullable=True)     # okul, iş, arkadaş, romantik...
+    occasion_group_id = Column(
+        Integer,
+        ForeignKey("occasion_groups.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     note       = Column(String, nullable=True)
 
     # İleride hava durumu entegrasyonu için anlık görüntü
@@ -79,3 +108,4 @@ class WearHistory(Base):
 
     outfit  = relationship("Outfit")
     clothes = relationship("Clothing", secondary=wear_items)
+    occasion_group = relationship("OccasionGroup")

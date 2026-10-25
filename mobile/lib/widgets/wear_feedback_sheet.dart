@@ -1,28 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:dijital_dolap/models/wear_entry.dart';
+import 'package:dijital_dolap/providers/occasion_provider.dart';
 import 'package:dijital_dolap/providers/wear_provider.dart';
 import 'package:dijital_dolap/theme/app_theme.dart';
-
-const wearOccasions = [
-  'Okul',
-  'İş',
-  'Arkadaş',
-  'Romantik',
-  'Özel gün',
-  'Spor',
-  'Günlük',
-];
+import 'package:dijital_dolap/widgets/occasion_group_dialog.dart';
 
 /// Giyim kaydından sonra isteğe bağlı puan + amaç sorar.
-/// "Atla" denirse kayıt puansız kalır; sonradan geçmişten puanlanabilir.
+/// "Atla" denirse kayıt olduğu gibi kalır; sonradan geçmişten düzenlenebilir.
 Future<void> showWearFeedbackSheet(
   BuildContext context,
   WearEntry entry,
 ) async {
-  final provider = context.read<WearProvider>();
+  final wear = context.read<WearProvider>();
+  final occasions = context.read<OccasionProvider>();
+  if (occasions.groups.isEmpty) {
+    await occasions.load();
+  }
+  if (!context.mounted) return;
+
   var rating = entry.rating ?? 0;
-  final occasionCtrl = TextEditingController(text: entry.occasion ?? '');
+  int? selectedGroupId = entry.occasionGroupId;
+  if (selectedGroupId == null && entry.occasion != null) {
+    final name = entry.occasion!.toLowerCase();
+    for (final group in occasions.groups) {
+      if (group.name.toLowerCase() == name) {
+        selectedGroupId = group.id;
+        break;
+      }
+    }
+  }
 
   final saved = await showModalBottomSheet<bool>(
     context: context,
@@ -34,6 +41,7 @@ Future<void> showWearFeedbackSheet(
     builder: (ctx) {
       return StatefulBuilder(
         builder: (ctx, setSheet) {
+          final groups = occasions.groups;
           return Padding(
             padding: EdgeInsets.fromLTRB(
               20,
@@ -78,36 +86,48 @@ Future<void> showWearFeedbackSheet(
                         onPressed: () => setSheet(() => rating = i),
                         iconSize: 34,
                         icon: Icon(
-                          i <= rating ? Icons.star_rounded : Icons.star_border_rounded,
-                          color: i <= rating ? AppColors.thread : AppColors.slate,
+                          i <= rating
+                              ? Icons.star_rounded
+                              : Icons.star_border_rounded,
+                          color: i <= rating
+                              ? AppColors.thread
+                              : AppColors.slate,
                         ),
                       ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                TextField(
-                  controller: occasionCtrl,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                    labelText: 'Amaç / ortam',
-                    hintText: 'okul, iş, arkadaş buluşması...',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.event_note_outlined),
+                const SizedBox(height: 8),
+                const Text(
+                  'Amaç / ortam',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.slate,
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
                   runSpacing: 4,
                   children: [
-                    for (final occasion in wearOccasions)
+                    for (final group in groups)
                       ChoiceChip(
-                        label: Text(occasion),
-                        selected: occasionCtrl.text == occasion,
-                        onSelected: (_) {
-                          setSheet(() => occasionCtrl.text = occasion);
-                        },
+                        label: Text(group.label),
+                        selected: selectedGroupId == group.id,
+                        onSelected: (_) => setSheet(
+                          () => selectedGroupId = group.id,
+                        ),
                       ),
+                    ActionChip(
+                      avatar: const Icon(Icons.add, size: 16),
+                      label: const Text('Yeni grup'),
+                      onPressed: () async {
+                        final created = await showOccasionGroupDialog(ctx);
+                        if (created != null) {
+                          setSheet(() => selectedGroupId = created.id);
+                        }
+                      },
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -141,11 +161,14 @@ Future<void> showWearFeedbackSheet(
   );
 
   if (saved == true) {
-    await provider.updateEntry(
-      entry,
-      rating: rating > 0 ? rating : null,
-      occasion: occasionCtrl.text.trim(),
-    );
+    final newRating = rating > 0 ? rating : null;
+    if (newRating != entry.rating ||
+        selectedGroupId != entry.occasionGroupId) {
+      await wear.updateEntry(
+        entry,
+        rating: newRating,
+        occasionGroupId: selectedGroupId,
+      );
+    }
   }
-  occasionCtrl.dispose();
 }

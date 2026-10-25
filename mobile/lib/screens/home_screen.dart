@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:dijital_dolap/providers/occasion_provider.dart';
 import 'package:dijital_dolap/screens/outfits_screen.dart';
 import 'package:dijital_dolap/screens/profile_screen.dart';
 import 'package:dijital_dolap/screens/wardrobe_screen.dart';
@@ -20,6 +22,14 @@ class _HomeScreenState extends State<HomeScreen> {
     WearHistoryScreen(),
     ProfileScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<OccasionProvider>().load();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

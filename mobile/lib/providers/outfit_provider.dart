@@ -43,10 +43,32 @@ class OutfitProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> saveOutfit(List<int> clothingIds) async {
-    final outfit = await _repo.create(clothingIds);
+  Future<Outfit> saveOutfit(
+    List<int> clothingIds, {
+    List<int> occasionIds = const [],
+  }) async {
+    final outfit = await _repo.create(clothingIds, occasionIds: occasionIds);
     _outfits.insert(0, outfit);
     notifyListeners();
+    return outfit;
+  }
+
+  Future<bool> setOccasions(Outfit outfit, List<int> occasionIds) async {
+    if (outfit.id == null) return false;
+    try {
+      final updated = await _repo.setOccasions(outfit.id!, occasionIds);
+      final i = _outfits.indexWhere((o) => o.id == outfit.id);
+      if (i != -1) {
+        _outfits[i] = updated;
+        notifyListeners();
+      }
+      _error = null;
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<void> toggleFavorite(Outfit outfit) async {

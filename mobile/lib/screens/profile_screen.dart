@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:dijital_dolap/providers/auth_provider.dart';
 import 'package:dijital_dolap/providers/clothing_provider.dart';
+import 'package:dijital_dolap/providers/occasion_provider.dart';
 import 'package:dijital_dolap/providers/outfit_provider.dart';
 import 'package:dijital_dolap/providers/wear_provider.dart';
+import 'package:dijital_dolap/screens/occasion_groups_screen.dart';
 import 'package:dijital_dolap/theme/app_theme.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -39,6 +41,7 @@ class ProfileScreen extends StatelessWidget {
       context.read<ClothingProvider>().clear();
       context.read<OutfitProvider>().clear();
       context.read<WearProvider>().clear();
+      context.read<OccasionProvider>().clear();
       await context.read<AuthProvider>().logout();
     }
   }
@@ -184,6 +187,22 @@ class ProfileScreen extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(child: _Stat(value: '$ironing', label: 'Ütü bekleyen')),
             ],
+          ),
+          const SizedBox(height: 24),
+
+          const _SectionTitle('Tercihler'),
+          _Panel(
+            padding: EdgeInsets.zero,
+            child: _NavTile(
+              icon: Icons.local_offer_outlined,
+              title: 'Amaç grupları',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const OccasionGroupsScreen(),
+                ),
+              ),
+            ),
           ),
           const SizedBox(height: 24),
 
