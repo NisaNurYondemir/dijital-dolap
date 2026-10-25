@@ -31,8 +31,4 @@ class OutfitRepository {
   Future<void> delete(int id) async {
     await _api.delete('/outfits/$id');
   }
-
-  Future<void> logWear(int outfitId) async {
-    await _api.post('/wear/', body: {'outfit_id': outfitId});
-  }
 }

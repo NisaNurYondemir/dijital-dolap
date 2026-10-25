@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:dijital_dolap/providers/auth_provider.dart';
 import 'package:dijital_dolap/providers/clothing_provider.dart';
 import 'package:dijital_dolap/providers/outfit_provider.dart';
+import 'package:dijital_dolap/providers/wear_provider.dart';
 import 'package:dijital_dolap/theme/app_theme.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -37,6 +38,7 @@ class ProfileScreen extends StatelessWidget {
       // Önce önceki hesabın verisini temizle, sonra oturumu kapat
       context.read<ClothingProvider>().clear();
       context.read<OutfitProvider>().clear();
+      context.read<WearProvider>().clear();
       await context.read<AuthProvider>().logout();
     }
   }

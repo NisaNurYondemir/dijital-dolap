@@ -4,6 +4,7 @@ import 'package:dijital_dolap/data/api_client.dart';
 import 'package:dijital_dolap/providers/auth_provider.dart';
 import 'package:dijital_dolap/providers/clothing_provider.dart';
 import 'package:dijital_dolap/providers/outfit_provider.dart';
+import 'package:dijital_dolap/providers/wear_provider.dart';
 import 'package:dijital_dolap/screens/home_screen.dart';
 import 'package:dijital_dolap/screens/login_screen.dart';
 import 'package:dijital_dolap/theme/app_theme.dart';
@@ -23,6 +24,7 @@ class _DijitalDolapAppState extends State<DijitalDolapApp> {
   late final AuthProvider _auth;
   late final ClothingProvider _clothing;
   late final OutfitProvider _outfits;
+  late final WearProvider _wear;
 
   @override
   void initState() {
@@ -30,6 +32,7 @@ class _DijitalDolapAppState extends State<DijitalDolapApp> {
     _auth = AuthProvider();
     _clothing = ClothingProvider();
     _outfits = OutfitProvider();
+    _wear = WearProvider();
 
     // Token süresi dolunca (401) oturumu ve önceki hesabın verisini temizle.
     ApiClient.instance.onUnauthorized = _handleUnauthorized;
@@ -40,6 +43,7 @@ class _DijitalDolapAppState extends State<DijitalDolapApp> {
     if (_auth.status != AuthStatus.authenticated) return;
     _clothing.clear();
     _outfits.clear();
+    _wear.clear();
     _auth.logout();
   }
 
@@ -49,6 +53,7 @@ class _DijitalDolapAppState extends State<DijitalDolapApp> {
     _auth.dispose();
     _clothing.dispose();
     _outfits.dispose();
+    _wear.dispose();
     super.dispose();
   }
 
@@ -59,6 +64,7 @@ class _DijitalDolapAppState extends State<DijitalDolapApp> {
         ChangeNotifierProvider.value(value: _auth),
         ChangeNotifierProvider.value(value: _clothing),
         ChangeNotifierProvider.value(value: _outfits),
+        ChangeNotifierProvider.value(value: _wear),
       ],
       child: MaterialApp(
         title: 'Dijital Dolap',

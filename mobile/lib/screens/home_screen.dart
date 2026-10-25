@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:dijital_dolap/screens/outfits_screen.dart';
 import 'package:dijital_dolap/screens/profile_screen.dart';
 import 'package:dijital_dolap/screens/wardrobe_screen.dart';
+import 'package:dijital_dolap/screens/wear_history_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,6 +17,7 @@ class _HomeScreenState extends State<HomeScreen> {
   static const _pages = <Widget>[
     WardrobeScreen(),
     OutfitsScreen(),
+    WearHistoryScreen(),
     ProfileScreen(),
   ];
 
@@ -36,6 +38,11 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.auto_awesome_outlined),
             selectedIcon: Icon(Icons.auto_awesome),
             label: 'Kombinler',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.history_outlined),
+            selectedIcon: Icon(Icons.history),
+            label: 'Geçmiş',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),

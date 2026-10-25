@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:dijital_dolap/data/api_client.dart';
 import 'package:dijital_dolap/models/outfit.dart';
-import 'package:dijital_dolap/models/clothing_item.dart';
 import 'package:dijital_dolap/providers/outfit_provider.dart';
+import 'package:dijital_dolap/providers/wear_provider.dart';
 import 'package:dijital_dolap/theme/app_theme.dart';
+import 'package:dijital_dolap/widgets/clothing_thumb.dart';
+import 'package:dijital_dolap/widgets/wear_feedback_sheet.dart';
 
 class OutfitsScreen extends StatefulWidget {
   const OutfitsScreen({super.key});
@@ -119,7 +120,7 @@ class _SuggestionCard extends StatelessWidget {
               scrollDirection: Axis.horizontal,
               itemCount: outfit.clothes.length,
               separatorBuilder: (_, _) => const SizedBox(width: 8),
-              itemBuilder: (_, i) => _ClothingThumb(item: outfit.clothes[i]),
+              itemBuilder: (_, i) => ClothingThumb(item: outfit.clothes[i]),
             ),
           ),
           const SizedBox(height: 10),
@@ -212,7 +213,7 @@ class _SavedOutfitCard extends StatelessWidget {
               scrollDirection: Axis.horizontal,
               itemCount: outfit.clothes.length,
               separatorBuilder: (_, _) => const SizedBox(width: 8),
-              itemBuilder: (_, i) => _ClothingThumb(item: outfit.clothes[i]),
+              itemBuilder: (_, i) => ClothingThumb(item: outfit.clothes[i]),
             ),
           ),
           const SizedBox(height: 10),
@@ -234,12 +235,22 @@ class _SavedOutfitCard extends StatelessWidget {
                 icon: const Icon(Icons.check_circle_outline),
                 color: AppColors.slate,
                 onPressed: () async {
-                  if (outfit.id != null) await p.logWear(outfit.id!);
-                  if (context.mounted) {
+                  if (outfit.id == null) return;
+                  final wear = context.read<WearProvider>();
+                  final entry = await wear.log(outfitId: outfit.id);
+                  if (!context.mounted) return;
+                  if (entry == null) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Giyim kaydedildi!')),
+                      SnackBar(
+                        content: Text(wear.error ?? 'Giyim kaydedilemedi'),
+                      ),
                     );
+                    return;
                   }
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Giyim kaydedildi!')),
+                  );
+                  await showWearFeedbackSheet(context, entry);
                 },
               ),
               // Sil
@@ -258,40 +269,3 @@ class _SavedOutfitCard extends StatelessWidget {
   }
 }
 
-// ── Ortak küçük görsel ────────────────────────────────────────────────────────
-
-class _ClothingThumb extends StatelessWidget {
-  const _ClothingThumb({required this.item});
-  final ClothingItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final url = item.imagePath != null
-        ? item.imageUrlFor(ApiClient.baseUrl)
-        : null;
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: SizedBox(
-        width: 80,
-        height: 100,
-        child: url != null
-            ? Image.network(
-                url,
-                fit: BoxFit.cover,
-                loadingBuilder: (_, child, progress) =>
-                    progress == null ? child : const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                errorBuilder: (_, _, _) => _placeholder(item.color),
-              )
-            : _placeholder(item.color),
-      ),
-    );
-  }
-
-  Widget _placeholder(Color? color) {
-    return Container(
-      color: color ?? AppColors.line,
-      child: const Icon(Icons.checkroom, color: Colors.white54),
-    );
-  }
-}

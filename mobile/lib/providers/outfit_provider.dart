@@ -59,10 +59,6 @@ class OutfitProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> logWear(int outfitId) async {
-    await _repo.logWear(outfitId);
-  }
-
   Future<void> deleteOutfit(int id) async {
     await _repo.delete(id);
     _outfits.removeWhere((o) => o.id == id);
