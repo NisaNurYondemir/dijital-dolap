@@ -3,7 +3,7 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Query
 
 from schemas.weather import CityOut, WeatherCurrentOut
-from weather import WeatherError, fetch_weather, geocode
+from weather import WeatherError, fetch_weather, geocode, reverse_geocode
 
 router = APIRouter(prefix="/weather", tags=["weather"])
 
@@ -56,3 +56,22 @@ def search_city(
         }
         for r in results
     ]
+
+
+@router.get("/reverse", response_model=CityOut)
+def reverse_city(
+    lat: float = Query(..., ge=-90, le=90),
+    lon: float = Query(..., ge=-180, le=180),
+):
+    """Cihaz konumu (GPS) -> şehir adı (Nominatim reverse geocoding)."""
+    try:
+        r = reverse_geocode(lat, lon)
+    except WeatherError as exc:
+        raise HTTPException(502, str(exc))
+    return {
+        "name": r["name"],
+        "admin1": r.get("admin1", ""),
+        "label": r["name"],
+        "latitude": r["latitude"],
+        "longitude": r["longitude"],
+    }

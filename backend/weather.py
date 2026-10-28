@@ -11,6 +11,7 @@ from typing import Optional
 
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search"
+REVERSE_URL = "https://nominatim.openstreetmap.org/reverse"
 
 
 class WeatherError(Exception):
@@ -162,3 +163,43 @@ def geocode(name: str, count: int = 5, timeout: float = 8.0) -> list[dict]:
             "longitude": float(item["longitude"]),
         })
     return results
+
+
+def _city_from_nominatim(data: dict) -> dict | None:
+    """Nominatim yanıtından en iyi şehir adayı (Türkiye odaklı)."""
+    adr = (data or {}).get("address") or {}
+    if adr.get("country_code", "").upper() != "TR":
+        return None
+    # Türkiye yanıtlarında il 'province', ilçe 'town' alanında gelir.
+    name = (adr.get("province") or adr.get("city") or adr.get("town")
+            or adr.get("district") or adr.get("county") or "")
+    if not name:
+        return None
+    return {
+        "name": name,
+        "admin1": adr.get("province", ""),
+        "latitude": float(data["lat"]),
+        "longitude": float(data["lon"]),
+    }
+
+
+def reverse_geocode(lat: float, lon: float, timeout: float = 8.0) -> dict:
+    """lat/lon -> şehir adı (Nominatim reverse geocoding, anahtar yok)."""
+    params = urllib.parse.urlencode({
+        "lat": lat,
+        "lon": lon,
+        "format": "jsonv2",
+        "accept-language": "tr",
+        "zoom": 10,
+    })
+    url = f"{REVERSE_URL}?{params}"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "dijital-dolap-demo/1.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as res:
+            data = json.load(res)
+    except Exception as exc:
+        raise WeatherError(f"Konum çözümlemesi başarısız: {exc}") from exc
+    result = _city_from_nominatim(data)
+    if result is None:
+        raise WeatherError("Konum Türkiye'de değil ya da şehir adı çözülemedi")
+    return result

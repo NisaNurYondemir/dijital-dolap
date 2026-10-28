@@ -1,4 +1,4 @@
-from weather import WeatherSummary, describe_weather_code
+from weather import WeatherSummary, describe_weather_code, _city_from_nominatim
 
 
 def _w(temp_c, code, precip=0.0):
@@ -40,3 +40,22 @@ def test_needs_outerwear_thresholds():
 
 def test_headline_contains_temp_and_description():
     assert _w(12.4, 61).headline() == "yağmurlu, 12°C"
+
+
+def test_reverse_geocode_picks_turkish_city():
+    data = {
+        'lat': '39.9334',
+        'lon': '32.8597',
+        'country_code': 'TR',
+        'address': {'city': 'Ankara', 'state': 'Ankara'},
+    }
+    result = _city_from_nominatim(data)
+    assert result is not None
+    assert result['name'] == 'Ankara'
+    assert result['latitude'] == 39.9334
+
+
+def test_reverse_geocode_rejects_foreign_location():
+    data = {'lat': '51.5', 'lon': '-0.12', 'country_code': 'GB',
+            'address': {'city': 'London'}}
+    assert _city_from_nominatim(data) is None
