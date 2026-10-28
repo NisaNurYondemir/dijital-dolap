@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:dijital_dolap/providers/calendar_provider.dart';
 import 'package:dijital_dolap/providers/occasion_provider.dart';
+import 'package:dijital_dolap/screens/calendar_screen.dart';
 import 'package:dijital_dolap/screens/outfits_screen.dart';
 import 'package:dijital_dolap/screens/profile_screen.dart';
 import 'package:dijital_dolap/screens/wardrobe_screen.dart';
 import 'package:dijital_dolap/screens/wear_history_screen.dart';
+import 'package:dijital_dolap/theme/app_theme.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,6 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
     WardrobeScreen(),
     OutfitsScreen(),
     WearHistoryScreen(),
+    CalendarScreen(),
     ProfileScreen(),
   ];
 
@@ -31,13 +35,52 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _goTo(int i) {
+    setState(() {
+      _index = i.clamp(0, _pages.length - 1);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Sayfa yüklendiği anda yaklaşan olay uyarılarını sor.
+    final calendar = context.watch<CalendarProvider>();
+    final urgent = calendar.pendingInsights.isEmpty
+        ? null
+        : calendar.pendingInsights.first;
+
     return Scaffold(
-      body: IndexedStack(index: _index, children: _pages),
+      body: Column(
+        children: [
+          if (urgent != null)
+            Material(
+              color: Colors.red.shade50,
+              child: InkWell(
+                onTap: () => _goTo(3),
+                child: ListTile(
+                  dense: true,
+                  leading: Icon(Icons.event_busy_outlined,
+                      color: Colors.red.shade700, size: 22),
+                  title: Text(
+                    urgent.message,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodyMedium
+                        ?.copyWith(color: Colors.red.shade900),
+                  ),
+                  trailing: const Icon(Icons.chevron_right,
+                      color: AppColors.slate),
+                ),
+              ),
+            ),
+          Expanded(
+            child: IndexedStack(index: _index, children: _pages),
+          ),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
+        onDestinationSelected: _goTo,
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.checkroom_outlined),
@@ -53,6 +96,11 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.history_outlined),
             selectedIcon: Icon(Icons.history),
             label: 'Geçmiş',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.event_outlined),
+            selectedIcon: Icon(Icons.event),
+            label: 'Takvim',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),

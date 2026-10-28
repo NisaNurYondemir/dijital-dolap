@@ -6,9 +6,10 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from database import engine
-from models import clothing, occasion, outfit, user
+from models import calendar_event, clothing, occasion, outfit, user
 from routers.auth_router import router as auth_router
 from routers.clothing_router import router as clothing_router
+from routers.event_router import router as event_router
 from routers.occasion_router import router as occasion_router
 from routers.outfit_router import router as outfit_router
 from routers.weather_router import router as weather_router
@@ -36,6 +37,7 @@ app.include_router(outfit_router)
 app.include_router(wear_router)
 app.include_router(occasion_router)
 app.include_router(weather_router)
+app.include_router(event_router)
 
 
 @app.get("/")

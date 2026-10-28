@@ -24,7 +24,7 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 from database import Base
-from models import user, clothing, outfit, occasion
+from models import user, clothing, outfit, occasion, calendar_event
 
 target_metadata = Base.metadata
 

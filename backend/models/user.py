@@ -15,3 +15,4 @@ class User(Base):
     # class içine:
     clothes  = relationship("Clothing", back_populates="owner")
     outfits  = relationship("Outfit",   back_populates="owner")
+    calendar_events = relationship("CalendarEvent", back_populates="owner")
