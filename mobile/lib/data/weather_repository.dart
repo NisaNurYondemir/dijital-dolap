@@ -24,4 +24,15 @@ class WeatherRepository {
         .map((e) => CitySuggestion.fromJson(e as Map<String, dynamic>))
         .toList();
   }
+
+  /// GPS koordinatını şehir adına çevirir (izinsiz; sadece etiketleme).
+  Future<CitySuggestion> reverseGeocode({
+    required double latitude,
+    required double longitude,
+  }) async {
+    final res = await _api.get(
+      '/weather/reverse?lat=$latitude&lon=$longitude',
+    );
+    return CitySuggestion.fromJson(res as Map<String, dynamic>);
+  }
 }

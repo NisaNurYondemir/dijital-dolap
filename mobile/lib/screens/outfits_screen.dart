@@ -70,10 +70,15 @@ class _OutfitsScreenState extends State<OutfitsScreen>
 /// Hava şeridi: şehir seçiliyse günlük hava özetini gösterir, değilse
 /// şehir seçme çağrısı yapar. Seçim sonrası _SuggestionsTab önerileri havayla yeniler.
 class _WeatherBar extends StatelessWidget {
-  const _WeatherBar({required this.onPick, required this.onClear});
+  const _WeatherBar({
+    required this.onPick,
+    required this.onClear,
+    required this.onLocate,
+  });
 
   final VoidCallback onPick;
   final VoidCallback onClear;
+  final VoidCallback onLocate;
 
   @override
   Widget build(BuildContext context) {
@@ -84,14 +89,36 @@ class _WeatherBar extends StatelessWidget {
     if (!hasWeather) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-        child: SizedBox(
-          height: 40,
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: weather.loading ? null : onPick,
-            icon: const Icon(Icons.cloud_outlined, size: 20),
-            label: const Text('Şehri seç — hava uyarınca öner'),
-          ),
+        child: Row(
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: 40,
+                child: OutlinedButton.icon(
+                  onPressed: weather.gpsBusy ? null : onLocate,
+                  icon: const Icon(Icons.my_location, size: 18),
+                  label: Text(
+                    weather.gpsBusy ? 'Konum alınıyor…' : 'Konumumu kullan',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: SizedBox(
+                height: 40,
+                child: OutlinedButton.icon(
+                  onPressed: weather.loading || weather.gpsBusy ? null : onPick,
+                  icon: const Icon(Icons.cloud_outlined, size: 18),
+                  label: const Text(
+                    'Şehri seç',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -112,7 +139,7 @@ class _WeatherBar extends StatelessWidget {
             child: Text(
               info != null
                   ? '${info.headline}${info.city != null ? ' — ${info.city}' : ''}'
-                  : 'Hava bilgisi alınamadı',
+                  : (weather.error ?? 'Hava bilgisi alınamadı'),
               style: Theme.of(context).textTheme.bodyMedium,
               overflow: TextOverflow.ellipsis,
             ),
@@ -294,6 +321,14 @@ class _SuggestionsTabState extends State<_SuggestionsTab> {
     _reloadSuggestions();
   }
 
+  Future<void> _useDeviceLocation() async {
+    final weather = context.read<WeatherProvider>();
+    await weather.useDeviceLocation();
+    if (!mounted) return;
+    setState(() => _selectedCity = weather.city);
+    _reloadSuggestions();
+  }
+
   void _clearCity() {
     setState(() => _selectedCity = null);
     context.read<WeatherProvider>().clearCity();
@@ -313,6 +348,7 @@ class _SuggestionsTabState extends State<_SuggestionsTab> {
         _WeatherBar(
           onPick: _pickCity,
           onClear: _clearCity,
+          onLocate: _useDeviceLocation,
         ),
         if (groups.isNotEmpty)
           SizedBox(
