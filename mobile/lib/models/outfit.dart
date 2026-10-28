@@ -9,6 +9,8 @@ class Outfit {
   final List<OccasionGroup> groups;
   final DateTime? createdAt;
   final double? score;
+  final double? colorScore;
+  final List<String> reasons;
 
   Outfit({
     this.id,
@@ -18,6 +20,8 @@ class Outfit {
     this.groups = const [],
     this.createdAt,
     this.score,
+    this.colorScore,
+    this.reasons = const [],
   });
 
   /// Kaydedilmiş kombin (GET /outfits/)
@@ -36,6 +40,10 @@ class Outfit {
           ? DateTime.parse(json['created_at'] as String)
           : null,
       score: (json['score'] as num?)?.toDouble(),
+      colorScore: (json['color_score'] as num?)?.toDouble(),
+      reasons: (json['reasons'] as List<dynamic>? ?? const [])
+          .map((e) => e.toString())
+          .toList(),
     );
   }
 
@@ -46,15 +54,20 @@ class Outfit {
           .map((e) => ClothingItem.fromJson(e as Map<String, dynamic>))
           .toList(),
       score: (json['score'] as num?)?.toDouble(),
+      colorScore: (json['color_score'] as num?)?.toDouble(),
+      reasons: (json['reasons'] as List<dynamic>? ?? const [])
+          .map((e) => e.toString())
+          .toList(),
     );
   }
 
   String get displayName => id != null ? 'Kombin #$id' : 'Öneri';
 
   String get scoreLabel {
-    if (score == null) return '';
-    if (score! >= 0.85) return '★ Mükemmel uyum';
-    if (score! >= 0.75) return '★ İyi uyum';
+    final value = colorScore ?? score;
+    if (value == null) return '';
+    if (value >= 0.85) return '★ Mükemmel uyum';
+    if (value >= 0.75) return '★ İyi uyum';
     return '★ Kabul edilebilir';
   }
 }

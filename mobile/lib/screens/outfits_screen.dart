@@ -64,36 +64,93 @@ class _OutfitsScreenState extends State<OutfitsScreen>
 
 // ── Öneriler sekmesi ──────────────────────────────────────────────────────────
 
-class _SuggestionsTab extends StatelessWidget {
+class _SuggestionsTab extends StatefulWidget {
   const _SuggestionsTab();
+
+  @override
+  State<_SuggestionsTab> createState() => _SuggestionsTabState();
+}
+
+class _SuggestionsTabState extends State<_SuggestionsTab> {
+  int? _selectedGroupId;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final occasions = context.read<OccasionProvider>();
+      if (occasions.groups.isEmpty) occasions.load();
+    });
+  }
+
+  void _selectGroup(int? groupId) {
+    if (_selectedGroupId == groupId) return;
+    setState(() => _selectedGroupId = groupId);
+    context.read<OutfitProvider>().loadSuggestions(occasionId: groupId);
+  }
 
   @override
   Widget build(BuildContext context) {
     final p = context.watch<OutfitProvider>();
+    final groups = context.watch<OccasionProvider>().groups;
+    final selectedId = groups.any((g) => g.id == _selectedGroupId)
+        ? _selectedGroupId
+        : null;
 
-    if (p.loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (p.error != null) {
-      return Center(child: Text('Hata: ${p.error}'));
-    }
-    if (p.suggestions.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(32),
-          child: Text(
-            'Öneri üretmek için dolabında en az bir üst ve bir alt giysi olmalı.',
-            textAlign: TextAlign.center,
+    return Column(
+      children: [
+        if (groups.isNotEmpty)
+          SizedBox(
+            height: 52,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              itemCount: groups.length + 1,
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (context, i) {
+                if (i == 0) {
+                  return ChoiceChip(
+                    label: const Text('Tümü'),
+                    selected: selectedId == null,
+                    onSelected: (_) => _selectGroup(null),
+                  );
+                }
+                final group = groups[i - 1];
+                return ChoiceChip(
+                  label: Text(group.label),
+                  selected: selectedId == group.id,
+                  onSelected: (_) => _selectGroup(group.id),
+                );
+              },
+            ),
           ),
+        Expanded(
+          child: p.suggestionsLoading
+              ? const Center(child: CircularProgressIndicator())
+              : p.suggestionsError != null
+                  ? Center(child: Text('Hata: ${p.suggestionsError}'))
+                  : p.suggestions.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Text(
+                              selectedId == null
+                                  ? 'Öneri üretmek için dolabında en az bir üst ve bir alt giysi olmalı.'
+                                  : 'Bu amaç için yeterli parça yok. Başka bir grup seçebilir veya Tümü’ne dönebilirsin.',
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+                          itemCount: p.suggestions.length,
+                          separatorBuilder: (_, _) =>
+                              const SizedBox(height: 14),
+                          itemBuilder: (context, i) =>
+                              _SuggestionCard(outfit: p.suggestions[i]),
+                        ),
         ),
-      );
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-      itemCount: p.suggestions.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 14),
-      itemBuilder: (context, i) => _SuggestionCard(outfit: p.suggestions[i]),
+      ],
     );
   }
 }
@@ -132,7 +189,46 @@ class _SuggestionCard extends StatelessWidget {
             Text(outfit.scoreLabel,
                 style: text.bodySmall
                     ?.copyWith(color: AppColors.thread, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 6),
+          if (outfit.reasons.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final reason in outfit.reasons)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.thread.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.thread.withValues(alpha: 0.18),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.auto_awesome,
+                          size: 13,
+                          color: AppColors.thread,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          reason,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.ink,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 10),
           // Kaydet butonu
           SizedBox(
             width: double.infinity,
@@ -227,7 +323,7 @@ class _MyOutfitsTabState extends State<_MyOutfitsTab> {
             ),
           ),
         Expanded(
-          child: p.loading && p.outfits.isEmpty
+          child: p.outfitsLoading && p.outfits.isEmpty
               ? const Center(child: CircularProgressIndicator())
               : outfits.isEmpty
                   ? Center(

@@ -1,4 +1,7 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:provider/provider.dart';
 import 'package:dijital_dolap/data/api_client.dart';
 import 'package:dijital_dolap/providers/auth_provider.dart';
@@ -11,6 +14,12 @@ import 'package:dijital_dolap/screens/login_screen.dart';
 import 'package:dijital_dolap/theme/app_theme.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Web'de otomatik erişilebilirlik desteği: ekran okuyuculara semantik ağaç
+  // sunulur. Diğer platformlarda etkisizdir (ağaç zaten mevcut).
+  if (kIsWeb) {
+    SemanticsBinding.instance.ensureSemantics();
+  }
   runApp(const DijitalDolapApp());
 }
 

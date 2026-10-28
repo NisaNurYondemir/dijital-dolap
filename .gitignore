@@ -20,3 +20,6 @@ datasets/
 *.pt
 *.pth
 *.onnx
+
+# Flutter web yerel canvaskit kopyası (SDK artefaktı; web hata ayıklama için)
+mobile/web/canvaskit/

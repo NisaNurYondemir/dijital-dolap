@@ -1,3 +1,4 @@
+from itertools import combinations
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -7,11 +8,11 @@ from auth import get_db, get_current_user
 from color_engine import Color, score_outfit
 from models.clothing import Clothing
 from models.occasion import OccasionGroup
-from models.outfit import Outfit
+from models.outfit import Outfit, WearHistory
 from models.user import User
 from schemas.clothing import ClothingOut, Season
 from schemas.outfit import OutfitCreate, OutfitOut, OutfitSuggestion, OutfitUpdate
-from suggestion import suggest_outfits
+from suggestion import ItemHistory, PairHistory, group_of, suggest_outfits
 
 router = APIRouter(prefix="/outfits", tags=["outfits"])
 def get_owned_outfit(outfit_id: int, db: Session, user: User) -> Outfit:
@@ -97,27 +98,129 @@ def list_outfits(
         )
     return query.order_by(Outfit.created_at.desc(), Outfit.id.desc()).all()
 
+def _wear_signals(
+    db: Session,
+    user: User,
+    occasion: Optional[OccasionGroup],
+) -> tuple[dict[int, ItemHistory], dict[tuple[int, int], PairHistory]]:
+    """Giyim geçmişini öneri motorunun beklediği sinyallere çevirir."""
+    history: dict[int, ItemHistory] = {}
+    pairs: dict[tuple[int, int], PairHistory] = {}
+
+    wears = (
+        db.query(WearHistory)
+        .options(selectinload(WearHistory.clothes))
+        .filter(WearHistory.user_id == user.id)
+        .all()
+    )
+    for wear in wears:
+        same_occasion = (
+            occasion is not None
+            and wear.occasion_group_id == occasion.id
+        )
+        for item in wear.clothes:
+            entry = history.setdefault(item.id, ItemHistory())
+            entry.wear_count += 1
+            if wear.rating is not None:
+                entry.rating_sum += wear.rating
+                entry.rating_count += 1
+            if wear.worn_at is not None and (
+                entry.last_worn is None or wear.worn_at > entry.last_worn
+            ):
+                entry.last_worn = wear.worn_at
+            if same_occasion:
+                entry.occasion_wear_count += 1
+                if wear.rating is not None:
+                    entry.occasion_rating_sum += wear.rating
+                    entry.occasion_rating_count += 1
+
+        # Birlikte giyilip puanlanan ikililer, kombin uyumunun ek sinyalidir.
+        if wear.rating is not None and len(wear.clothes) >= 2:
+            for first, second in combinations(wear.clothes, 2):
+                key = tuple(sorted((first.id, second.id)))
+                pair = pairs.setdefault(key, PairHistory())
+                pair.count += 1
+                pair.rating_sum += wear.rating
+                pair.rating_count += 1
+
+    if occasion is not None:
+        # Henüz giyilmemiş olsa bile o amaçla kaydedilen kombinlerdeki
+        # parçalar "bu amaçla kullandığın parçalar" sinyali verir.
+        outfits = (
+            db.query(Outfit)
+            .options(selectinload(Outfit.clothes))
+            .join(Outfit.groups)
+            .filter(
+                Outfit.user_id == user.id,
+                OccasionGroup.id == occasion.id,
+            )
+            .all()
+        )
+        for outfit in outfits:
+            for item in outfit.clothes:
+                entry = history.setdefault(item.id, ItemHistory())
+                entry.occasion_outfit_count += 1
+
+    return history, pairs
+
+
 @router.get("/suggest", response_model=list[OutfitSuggestion])
 def suggest(
     season: Optional[Season] = None,
     limit: int = Query(5, ge=1, le=20),
     include_shoes: bool = True,
     include_outerwear: bool = False,
+    occasion_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Giyilebilir kıyafetlerden renk uyumuna göre en iyi kombinleri önerir."""
+    """Renk uyumu + giyim geçmişinden öğrenilen tercihlere göre önerir."""
+    occasion: Optional[OccasionGroup] = None
+    if occasion_id is not None:
+        occasion = (
+            db.query(OccasionGroup)
+            .filter(
+                OccasionGroup.id == occasion_id,
+                OccasionGroup.user_id == current_user.id,
+            )
+            .first()
+        )
+        if not occasion:
+            raise HTTPException(404, "Amaç grubu bulunamadı")
+
     clothes = db.query(Clothing).filter(Clothing.user_id == current_user.id).all()
+    history, pairs = _wear_signals(db, current_user, occasion)
+
+    # Amaç seçiliyse ve o amaçla ilişkili yeterli parça varsa adayları daralt;
+    # yoksa tüm dolaptan önererek yeni kullanıcıyı boş ekranla bırakma.
+    if occasion is not None:
+        related_ids = {
+            item_id
+            for item_id, signals in history.items()
+            if signals.occasion_wear_count or signals.occasion_outfit_count
+        }
+        related = [item for item in clothes if item.id in related_ids]
+        has_top = any(group_of(item.category) == "ust" for item in related)
+        has_bottom = any(group_of(item.category) == "alt" for item in related)
+        has_dress = any(group_of(item.category) == "elbise" for item in related)
+        if (has_top and has_bottom) or has_dress:
+            clothes = related
+
     results = suggest_outfits(
         clothes,
         season=season,
         limit=limit,
         include_shoes=include_shoes,
         include_outerwear=include_outerwear,
+        history=history or None,
+        pair_history=pairs or None,
+        occasion_name=occasion.name if occasion else None,
     )
     return [
         OutfitSuggestion(
             score=round(r.score, 3),
+            color_score=round(r.color_score, 3),
+            reasons=r.reasons,
             clothes=[ClothingOut.model_validate(i) for i in r.items],
         )
         for r in results

@@ -1,6 +1,7 @@
 import os
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
@@ -13,6 +14,15 @@ from routers.outfit_router import router as outfit_router
 from routers.wear_router import router as wear_router
 
 app = FastAPI(title="Dijital Dolap API")
+
+# Web (Flutter web) ön yüzünün ayrı bir porttandan API'yi çağırabilmesi için.
+# Geliştirme ortamında yerel kaynaklara izin verilir.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:37498", "http://127.0.0.1:37498"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Statik dosya yolu — görseller buradan servis edilir
 uploads_dir = os.path.join(os.path.dirname(__file__), "uploads")

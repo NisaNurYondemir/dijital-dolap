@@ -148,3 +148,41 @@ git clone --depth 1 https://github.com/alexeygrigorev/clothing-dataset-small \
 - Test seti 10 sınıf; uygulamada 20 kategori var. Ölçüm, kapsanan kategoriler
   için geçerlidir.
 - GPU yok (`torch 2.14.1+cpu`); eğitim CPU'da.
+
+## 9. Öneri motoru: geçmişten öğrenme (3. faz)
+
+`suggestion.py` artık yalnızca renk uyumuna bakmıyor; giyim geçmişinden
+üç tür sinyal öğreniyor ve önerilerin "neden" seçildiğini açıklıyor.
+
+Sinyaller (`_wear_signals`, `routers/outfit_router.py`):
+
+| Sinyal | Kaynak |
+|---|---|
+| `ItemHistory.rating_avg` | Parçanın giyimlerindeki ortalama puan (1-5 → 0-1) |
+| `PairHistory.rating_avg` | İki parçanın birlikte giyilip puanlandığı ikililer |
+| `occasion_*` alanları | Seçilen amaç grubundaki giyimler + o amaçla kaydedilmiş kombinlerdeki parçalar |
+| `last_worn` | Son giyim tarihi → 3/7/14 gün eşiğiyle "dolaşım" skoru |
+
+Nihai skor (`_is_candidate` filtrelerinden sonra):
+
+```
+tercih   = 0.50·parça_puanı + 0.20·ikili_puanı + 0.15·dolaşım + 0.15·amaç_yakınlığı
+skor     = renk_uyumu · (0.80 + 0.20·tercih)          # aralık 0.8·renk .. renk
+```
+
+- Renk uyumu hâl â belirleyici (±%20 çarpan); geçmiş verisi renk sıralamasını
+  devirme gücünde ama sınırlı.
+- Geçmiş hiç yokken (`history`/`pair_history` boş ve amaç seçili değilken)
+  eski davranış korunur: `skor == renk_uyumu`.
+- Son 3 günde giyilen parça 0 dolaşım alır (tekrarı azaltır); hiç giyilmemiş
+  veya 14 günden eski parça 1.0 alır.
+- Amaç (ör. "İş") seçiliyken parça tercihinde o amaçtaki puanlar %40 ağırlıkla
+  karışır; adaylar önce o amaçla ilişkili parçalara daraltılır, ilişkili
+  parça üst/alt veya elbise kurmaya yetmiyorsa tüm dolap kullanılır.
+
+Açıklamalar: `reasons` alanı kullanıcıya Türkçe nedenler döner ("İş için
+yüksek puanladığın parçalar", "Birlikte iyi puanladığın bir ikili", "Uzun
+süredir giyilmeyen parçalar", "Renkler birbiriyle çok uyumlu"). Mobil
+öneri kartında etiket olarak gösterilir. Testler:
+`backend/tests/test_suggestion_history.py` (7 test).
+
