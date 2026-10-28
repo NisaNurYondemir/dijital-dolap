@@ -11,6 +11,7 @@ from routers.auth_router import router as auth_router
 from routers.clothing_router import router as clothing_router
 from routers.occasion_router import router as occasion_router
 from routers.outfit_router import router as outfit_router
+from routers.weather_router import router as weather_router
 from routers.wear_router import router as wear_router
 
 app = FastAPI(title="Dijital Dolap API")
@@ -34,6 +35,7 @@ app.include_router(clothing_router)
 app.include_router(outfit_router)
 app.include_router(wear_router)
 app.include_router(occasion_router)
+app.include_router(weather_router)
 
 
 @app.get("/")

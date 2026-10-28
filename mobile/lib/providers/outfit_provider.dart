@@ -49,13 +49,23 @@ class OutfitProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> loadSuggestions({int? occasionId}) async {
+  Future<void> loadSuggestions({
+    int? occasionId,
+    double? latitude,
+    double? longitude,
+    String? city,
+  }) async {
     final request = ++_suggestionsRequest;
     _suggestionsLoading = true;
     _suggestionsError = null;
     notifyListeners();
     try {
-      final result = await _repo.getSuggestions(occasionId: occasionId);
+      final result = await _repo.getSuggestions(
+        occasionId: occasionId,
+        latitude: latitude,
+        longitude: longitude,
+        city: city,
+      );
       if (request != _suggestionsRequest) return;
       _suggestions = result;
     } catch (e) {

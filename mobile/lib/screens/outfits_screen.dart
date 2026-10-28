@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:dijital_dolap/models/occasion_group.dart';
 import 'package:dijital_dolap/models/outfit.dart';
+import 'package:dijital_dolap/data/weather_repository.dart';
+import 'package:dijital_dolap/models/weather.dart';
 import 'package:dijital_dolap/providers/occasion_provider.dart';
 import 'package:dijital_dolap/providers/outfit_provider.dart';
 import 'package:dijital_dolap/providers/wear_provider.dart';
+import 'package:dijital_dolap/providers/weather_provider.dart';
 import 'package:dijital_dolap/theme/app_theme.dart';
 import 'package:dijital_dolap/widgets/clothing_thumb.dart';
 import 'package:dijital_dolap/widgets/occasion_picker_sheet.dart';
@@ -64,6 +67,184 @@ class _OutfitsScreenState extends State<OutfitsScreen>
 
 // ── Öneriler sekmesi ──────────────────────────────────────────────────────────
 
+/// Hava şeridi: şehir seçiliyse günlük hava özetini gösterir, değilse
+/// şehir seçme çağrısı yapar. Seçim sonrası _SuggestionsTab önerileri havayla yeniler.
+class _WeatherBar extends StatelessWidget {
+  const _WeatherBar({required this.onPick, required this.onClear});
+
+  final VoidCallback onPick;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final weather = context.watch<WeatherProvider>();
+    final info = weather.weather;
+
+    final hasWeather = info != null || weather.error != null;
+    if (!hasWeather) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+        child: SizedBox(
+          height: 40,
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: weather.loading ? null : onPick,
+            icon: const Icon(Icons.cloud_outlined, size: 20),
+            label: const Text('Şehri seç — hava uyarınca öner'),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.wb_cloudy_outlined, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              info != null
+                  ? '${info.headline}${info.city != null ? ' — ${info.city}' : ''}'
+                  : 'Hava bilgisi alınamadı',
+              style: Theme.of(context).textTheme.bodyMedium,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (info != null && info.needsOuterwear)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Tooltip(
+                message: 'Soğuk görünüyor; mont veya ceket iyi gelir',
+                child: const Icon(Icons.ac_unit, size: 18),
+              ),
+            ),
+          TextButton(
+            onPressed: onPick,
+            child: const Text('Değiştir'),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 18),
+            onPressed: onClear,
+            tooltip: 'Hava önerisini kapat',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Şehir arama diyaloğu: yazı yazıldıkça Open-Meteo geocoding üzerinden
+/// Türkiye şehirleri listeler; seçilen aday döner (null = iptal).
+class CitySearchDialog extends StatefulWidget {
+  const CitySearchDialog({super.key});
+
+  @override
+  State<CitySearchDialog> createState() => _CitySearchDialogState();
+}
+
+class _CitySearchDialogState extends State<CitySearchDialog> {
+  final _controller = TextEditingController();
+  final _client = WeatherRepository();
+
+  List<CitySuggestion> _results = [];
+  bool _searching = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _search(String query) async {
+    if (query.trim().length < 2) return;
+    setState(() {
+      _searching = true;
+      _error = null;
+    });
+    try {
+      final results = await _client.searchCity(query.trim());
+      setState(() => _results = results);
+    } catch (_) {
+      setState(() => _error = 'Şehir arama başarısız');
+    } finally {
+      setState(() => _searching = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Şehir seç'),
+      content: SizedBox(
+        width: 320,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _controller,
+              decoration: const InputDecoration(
+                hintText: 'Örn. Eskişehir',
+                prefixIcon: Icon(Icons.search),
+              ),
+              onSubmitted: _search,
+            ),
+            const SizedBox(height: 12),
+            Flexible(
+              child: SizedBox(
+                height: 260,
+                child: _searching
+                    ? const Center(
+                        child: SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : _error != null
+                        ? Center(child: Text(_error!))
+                        : _results.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'Arama yap ya da şehir adı yaz — \n '
+                                  'bulunan şehirler burada listelenir.',
+                                  textAlign: TextAlign.center,
+                                ),
+                              )
+                            : ListView.builder(
+                                itemCount: _results.length,
+                                itemBuilder: (_, i) {
+                                  final city = _results[i];
+                                  return ListTile(
+                                    dense: true,
+                                    title: Text(city.label),
+                                    onTap: () => Navigator.of(context)
+                                        .pop<CitySuggestion>(city),
+                                  );
+                                },
+                              ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('İptal'),
+        ),
+      ],
+    );
+  }
+}
+
 class _SuggestionsTab extends StatefulWidget {
   const _SuggestionsTab();
 
@@ -73,6 +254,7 @@ class _SuggestionsTab extends StatefulWidget {
 
 class _SuggestionsTabState extends State<_SuggestionsTab> {
   int? _selectedGroupId;
+  CitySuggestion? _selectedCity;
 
   @override
   void initState() {
@@ -86,7 +268,36 @@ class _SuggestionsTabState extends State<_SuggestionsTab> {
   void _selectGroup(int? groupId) {
     if (_selectedGroupId == groupId) return;
     setState(() => _selectedGroupId = groupId);
-    context.read<OutfitProvider>().loadSuggestions(occasionId: groupId);
+    _reloadSuggestions();
+  }
+
+  void _reloadSuggestions() {
+    final city = _selectedCity;
+    context.read<OutfitProvider>().loadSuggestions(
+          occasionId: _selectedGroupId,
+          latitude: city?.latitude,
+          longitude: city?.longitude,
+          city: city?.name,
+        );
+  }
+
+  Future<void> _pickCity() async {
+    final city = await showDialog<CitySuggestion>(
+      context: context,
+      builder: (_) => const CitySearchDialog(),
+    );
+    if (city == null || !mounted) return;
+    setState(() => _selectedCity = city);
+    final weather = context.read<WeatherProvider>();
+    await weather.select(city);
+    if (!mounted) return;
+    _reloadSuggestions();
+  }
+
+  void _clearCity() {
+    setState(() => _selectedCity = null);
+    context.read<WeatherProvider>().clearCity();
+    _reloadSuggestions();
   }
 
   @override
@@ -99,6 +310,10 @@ class _SuggestionsTabState extends State<_SuggestionsTab> {
 
     return Column(
       children: [
+        _WeatherBar(
+          onPick: _pickCity,
+          onClear: _clearCity,
+        ),
         if (groups.isNotEmpty)
           SizedBox(
             height: 52,

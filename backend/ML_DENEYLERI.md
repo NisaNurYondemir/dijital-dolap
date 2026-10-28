@@ -186,3 +186,31 @@ süredir giyilmeyen parçalar", "Renkler birbiriyle çok uyumlu"). Mobil
 öneri kartında etiket olarak gösterilir. Testler:
 `backend/tests/test_suggestion_history.py` (7 test).
 
+## 10. Hava durumu önerisi (4. faz)
+
+`weather.py` — Open-Meteo istemcisi (API anahtarı yok):
+
+- `fetch_weather(lat, lon)` → `WeatherSummary` (sıcaklık, yağış, rüzgar,
+  WMO kodu, Türkçe açıklama). Ağ hatasında `WeatherError`; router zarif
+  biçimde havasuz öneriye döner.
+- `geocode(name)` → Şehir arama (yalnızca Türkiye sonuçları).
+- Sıcaklık → mevsim önerisi (`season_hint`): ≥26 yaz, ≥18 ilkbahar,
+  ≥7 sonbahar, altında kış. `needs_outerwear`: <14°C veya ıslak+<18°C.
+
+`/outfits/suggest` artık `lat/lon/city` kabul eder:
+
+```
+hava varsa → mevsim filtresi (kullanıcı mevsim vermemişse) +
+             soğuk/ıslak havada mont/ceket eklenir +
+             nedenlere "Bugün hava: ...", "Soğuk görünüyor..." eklenir
+mevsim filtresi dolabı sıfırlarsa → havasuz filtreyle yeniden dener
+```
+
+Yeni uç noktalar: `GET /weather/current?lat=&lon=&city=`,
+`GET /weather/search?name=`. (`routers/weather_router.py`)
+
+Mobil: Öneriler sekmesinde hava şeridi ("Şehri seç — hava uyarınca öner");
+CitySearchDialog geocoding ile Türkiye şehirlerini listeler, seçim sonrası
+öneriler havayla yenilenir (`WeatherProvider`). Testler:
+`backend/tests/test_weather.py` + `test_suggestion_history.py`'ye hava testi.
+

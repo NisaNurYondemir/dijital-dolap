@@ -10,10 +10,21 @@ class OutfitRepository {
     return res.map((e) => Outfit.fromJson(e as Map<String, dynamic>)).toList();
   }
 
-  Future<List<Outfit>> getSuggestions({int? occasionId}) async {
-    final path = occasionId == null
+  Future<List<Outfit>> getSuggestions({
+    int? occasionId,
+    double? latitude,
+    double? longitude,
+    String? city,
+  }) async {
+    final params = <String>[
+      if (occasionId != null) 'occasion_id=$occasionId',
+      if (latitude != null) 'lat=$latitude',
+      if (longitude != null) 'lon=$longitude',
+      if (city != null) 'city=${Uri.encodeComponent(city)}',
+    ];
+    final path = params.isEmpty
         ? '/outfits/suggest'
-        : '/outfits/suggest?occasion_id=$occasionId';
+        : '/outfits/suggest?${params.join('&')}';
     final res = await _api.get(path);
     if (res is! List) return [];
     return res

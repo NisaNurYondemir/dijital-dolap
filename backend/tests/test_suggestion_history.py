@@ -2,7 +2,7 @@ import random
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
-from suggestion import ItemHistory, PairHistory, suggest_outfits
+from suggestion import ItemHistory, PairHistory, WeatherContext, suggest_outfits
 
 
 def item(item_id, category, hue=0, sat=80, light=50, season="tum", wearable=True):
@@ -157,3 +157,23 @@ def test_occasion_without_history_gets_fallback_reason():
     )
 
     assert "Spor için yeni bir kombin" in result[0].reasons
+
+def test_weather_context_adds_reason_and_outerwear():
+    top = item(1, "tshirt", hue=0)
+    bottom = item(2, "pantolon", hue=0, sat=0, light=5)
+    outer = item(3, "mont", hue=0, sat=0, light=10)
+    weather = WeatherContext(headline="yağmurlu, 8°C", needs_outerwear=True)
+
+    result = suggest_outfits(
+        [top, bottom, outer],
+        include_outerwear=True,
+        rng=rng(),
+        now=NOW,
+        weather=weather,
+    )
+
+    joined = " | ".join(result[0].reasons)
+    assert "Bugün hava: yağmurlu, 8°C" in joined
+    assert any("mont" in i.category or "ceket" in i.category or "kaban" in i.category
+               for i in result[0].items)
+

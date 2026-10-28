@@ -93,6 +93,15 @@ class PairHistory:
 
 
 @dataclass
+class WeatherContext:
+    """Günün hava durumu özeti (sadece açıklama metni için kullanılır)."""
+
+    headline: str                  # "yağmurlu, 12°C"
+    needs_outerwear: bool = False
+    rainy: bool = False
+
+
+@dataclass
 class Suggestion:
     items: list
     score: float
@@ -215,8 +224,13 @@ def _reasons(
     pair_history: Optional[dict[tuple[int, int], PairHistory]],
     occasion_name: Optional[str],
     now: datetime,
+    weather: Optional[WeatherContext] = None,
 ) -> list[str]:
     reasons: list[str] = []
+    if weather is not None:
+        reasons.append(f"Bugün hava: {weather.headline}")
+        if weather.needs_outerwear:
+            reasons.append("Soğuk görünüyor; mont veya ceket iyi gelir")
     if color_score >= 0.85:
         reasons.append("Renkler birbiriyle çok uyumlu")
     elif color_score >= 0.7:
@@ -283,6 +297,7 @@ def suggest_outfits(
     pair_history: Optional[dict[tuple[int, int], PairHistory]] = None,
     occasion_name: Optional[str] = None,
     now: Optional[datetime] = None,
+    weather: Optional[WeatherContext] = None,
 ) -> list[Suggestion]:
     rng = rng or random.Random()
     now = now or datetime.now(timezone.utc)
@@ -367,6 +382,7 @@ def suggest_outfits(
                     pair_history,
                     occasion_name,
                     now,
+                    weather=weather,
                 ),
             )
         )

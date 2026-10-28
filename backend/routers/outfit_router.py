@@ -12,7 +12,8 @@ from models.outfit import Outfit, WearHistory
 from models.user import User
 from schemas.clothing import ClothingOut, Season
 from schemas.outfit import OutfitCreate, OutfitOut, OutfitSuggestion, OutfitUpdate
-from suggestion import ItemHistory, PairHistory, group_of, suggest_outfits
+from suggestion import ItemHistory, PairHistory, WeatherContext, group_of, suggest_outfits
+from weather import WeatherError, fetch_weather
 
 router = APIRouter(prefix="/outfits", tags=["outfits"])
 def get_owned_outfit(outfit_id: int, db: Session, user: User) -> Outfit:
@@ -171,10 +172,19 @@ def suggest(
     include_shoes: bool = True,
     include_outerwear: bool = False,
     occasion_id: Optional[int] = Query(None),
+    lat: Optional[float] = Query(None, ge=-90, le=90),
+    lon: Optional[float] = Query(None, ge=-180, le=180),
+    city: Optional[str] = Query(None, max_length=80),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Renk uyumu + giyim geçmişinden öğrenilen tercihlere göre önerir."""
+    """Renk uyumu + giyim geçmişi + havaya göre önerir.
+
+    lat/lon verilirse Open-Meteo'dan günlük hava alınır: sıcaklığa göre
+    mevsim filtresi uygulanır, soğuk/ıslak havada üst giysi önerilir ve
+    nedenlerde hava bilgisi gösterilir. Hava servisi başarısız olursa
+    öneri hava bilgisi olmadan devam eder.
+    """
     occasion: Optional[OccasionGroup] = None
     if occasion_id is not None:
         occasion = (
@@ -187,6 +197,21 @@ def suggest(
         )
         if not occasion:
             raise HTTPException(404, "Amaç grubu bulunamadı")
+
+    weather_ctx: Optional[WeatherContext] = None
+    weather_season: Optional[str] = None
+    if lat is not None and lon is not None:
+        try:
+            summary = fetch_weather(lat, lon, city=city)
+        except WeatherError:
+            summary = None
+        if summary is not None:
+            weather_season = summary.season_hint
+            weather_ctx = WeatherContext(
+                headline=summary.headline(),
+                needs_outerwear=summary.needs_outerwear,
+                rainy=summary.is_rainy_snowy,
+            )
 
     clothes = db.query(Clothing).filter(Clothing.user_id == current_user.id).all()
     history, pairs = _wear_signals(db, current_user, occasion)
@@ -206,16 +231,35 @@ def suggest(
         if (has_top and has_bottom) or has_dress:
             clothes = related
 
+    effective_season: Optional[str] = season.value if season else weather_season
+    outerwear = include_outerwear or (
+        weather_ctx is not None and weather_ctx.needs_outerwear
+    )
     results = suggest_outfits(
         clothes,
-        season=season,
+        season=effective_season,
         limit=limit,
         include_shoes=include_shoes,
-        include_outerwear=include_outerwear,
+        include_outerwear=outerwear,
         history=history or None,
         pair_history=pairs or None,
         occasion_name=occasion.name if occasion else None,
+        weather=weather_ctx,
     )
+    if not results and weather_season and season is None:
+        # Hava filtresi dolabı sıfırladıysa mevsim kısıtını bırakır; hava
+        # açıklamaları yine de önerilerin nedenlerine işlenir.
+        results = suggest_outfits(
+            clothes,
+            season=None,
+            limit=limit,
+            include_shoes=include_shoes,
+            include_outerwear=outerwear,
+            history=history or None,
+            pair_history=pairs or None,
+            occasion_name=occasion.name if occasion else None,
+            weather=weather_ctx,
+        )
     return [
         OutfitSuggestion(
             score=round(r.score, 3),
