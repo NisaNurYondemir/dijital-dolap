@@ -117,9 +117,16 @@ class _EventTile extends StatelessWidget {
         border: Border.all(
           color: insight != null && !insight.ready
               ? Colors.red.shade300
-              : AppColors.line,
+              : AppColors.line.withValues(alpha: 0.7),
           width: insight != null && !insight.ready ? 1.5 : 1,
         ),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.shadow,
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         children: [

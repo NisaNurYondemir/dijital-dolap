@@ -20,14 +20,22 @@ class ClothingCard extends StatelessWidget {
 
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(20),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Container(
           decoration: BoxDecoration(
-            border: Border.all(color: AppColors.line),
-            borderRadius: BorderRadius.circular(18),
+            color: Colors.white,
+            border: Border.all(color: AppColors.line.withValues(alpha: 0.7)),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: const [
+              BoxShadow(
+                color: AppColors.shadow,
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -61,7 +69,7 @@ class ClothingCard extends StatelessWidget {
                             ),
                           ),
                         )
-                      : Icon(Icons.checkroom, size: 48, color: iconColor),
+                      : Icon(Icons.checkroom, size: 52, color: iconColor),
                 ),
               ),
               Padding(

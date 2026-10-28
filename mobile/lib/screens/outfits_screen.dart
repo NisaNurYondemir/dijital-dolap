@@ -125,45 +125,87 @@ class _WeatherBar extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.line),
+        gradient: AppColors.weatherGradient,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.shadow,
+            blurRadius: 14,
+            offset: Offset(0, 5),
+          ),
+        ],
       ),
       child: Row(
         children: [
-          const Icon(Icons.wb_cloudy_outlined, size: 20),
-          const SizedBox(width: 8),
+          Icon(_iconFor(info), size: 22, color: Colors.white),
+          const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              info != null
-                  ? '${info.headline}${info.city != null ? ' — ${info.city}' : ''}'
-                  : (weather.error ?? 'Hava bilgisi alınamadı'),
-              style: Theme.of(context).textTheme.bodyMedium,
-              overflow: TextOverflow.ellipsis,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  info != null
+                      ? '${info.headline}${info.city != null ? ' — ${info.city}' : ''}'
+                      : (weather.error ?? 'Hava bilgisi alınamadı'),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.1,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (info != null && info.needsOuterwear)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 2),
+                    child: Text(
+                      'Soğuk görünüyor; mont veya ceket iyi gelir',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
             ),
           ),
-          if (info != null && info.needsOuterwear)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Tooltip(
-                message: 'Soğuk görünüyor; mont veya ceket iyi gelir',
-                child: const Icon(Icons.ac_unit, size: 18),
-              ),
-            ),
           TextButton(
             onPressed: onPick,
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.white,
+              textStyle: const TextStyle(fontWeight: FontWeight.w700),
+              visualDensity: VisualDensity.compact,
+            ),
             child: const Text('Değiştir'),
           ),
           IconButton(
-            icon: const Icon(Icons.close, size: 18),
+            icon: const Icon(Icons.close, size: 18, color: Colors.white70),
             onPressed: onClear,
             tooltip: 'Hava önerisini kapat',
+            visualDensity: VisualDensity.compact,
           ),
         ],
       ),
     );
+  }
+
+  IconData _iconFor(WeatherInfo? info) {
+    if (info == null) return Icons.wb_cloudy_outlined;
+    final desc = info.description;
+    if (desc.contains('kar')) return Icons.ac_unit;
+    if (desc.contains('yağmur') || desc.contains('sağanak') ||
+        desc.contains('çiseleme')) {
+      return Icons.umbrella_outlined;
+    }
+    if (desc.contains('bulut') || desc.contains('kapalı')) {
+      return Icons.cloud_outlined;
+    }
+    return Icons.wb_sunny_outlined;
   }
 }
 
