@@ -46,8 +46,11 @@ def test_reverse_geocode_picks_turkish_city():
     data = {
         'lat': '39.9334',
         'lon': '32.8597',
-        'country_code': 'TR',
-        'address': {'city': 'Ankara', 'state': 'Ankara'},
+        'address': {
+            'country_code': 'tr',  # API küçük harf döndürüyor
+            'province': 'Ankara',
+            'town': 'Altındağ',
+        },
     }
     result = _city_from_nominatim(data)
     assert result is not None
@@ -56,6 +59,6 @@ def test_reverse_geocode_picks_turkish_city():
 
 
 def test_reverse_geocode_rejects_foreign_location():
-    data = {'lat': '51.5', 'lon': '-0.12', 'country_code': 'GB',
-            'address': {'city': 'London'}}
+    data = {'lat': '51.5', 'lon': '-0.12',
+            'address': {'country_code': 'gb', 'city': 'London'}}
     assert _city_from_nominatim(data) is None

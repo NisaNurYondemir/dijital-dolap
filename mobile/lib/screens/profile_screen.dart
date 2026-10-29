@@ -90,6 +90,12 @@ class ProfileScreen extends StatelessWidget {
               );
               return;
             }
+            if (newCtrl.text.length < 6) {
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                const SnackBar(content: Text('Yeni şifre en az 6 karakter olmalı')),
+              );
+              return;
+            }
             final error = await ctx.read<AuthProvider>().changePassword(
                   currentPassword: currentCtrl.text,
                   newPassword: newCtrl.text,
