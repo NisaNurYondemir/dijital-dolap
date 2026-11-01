@@ -35,10 +35,12 @@ class OutfitRepository {
   Future<Outfit> create(
     List<int> clothingIds, {
     List<int> occasionIds = const [],
+    bool isFavorite = false,
   }) async {
     final res = await _api.post('/outfits/', body: {
       'clothing_ids': clothingIds,
       if (occasionIds.isNotEmpty) 'occasion_ids': occasionIds,
+      'is_favorite': isFavorite,
     });
     return Outfit.fromJson(res as Map<String, dynamic>);
   }

@@ -82,8 +82,13 @@ class OutfitProvider extends ChangeNotifier {
   Future<Outfit> saveOutfit(
     List<int> clothingIds, {
     List<int> occasionIds = const [],
+    bool isFavorite = false,
   }) async {
-    final outfit = await _repo.create(clothingIds, occasionIds: occasionIds);
+    final outfit = await _repo.create(
+      clothingIds,
+      occasionIds: occasionIds,
+      isFavorite: isFavorite,
+    );
     _outfits.insert(0, outfit);
     notifyListeners();
     return outfit;

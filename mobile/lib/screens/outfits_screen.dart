@@ -522,18 +522,77 @@ class _SuggestionCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 10),
-          // Kaydet butonu
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () => _save(context),
-              icon: const Icon(Icons.bookmark_add_outlined, size: 18),
-              label: const Text('Kombini Kaydet'),
-            ),
+          // Aksiyonlar: Giydim (bir adımda kayıt + puan) / Kaydet / Beğendim
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: () => _worn(context),
+                  icon: const Icon(Icons.check_circle_outline, size: 18),
+                  label: const Text('Giydim'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _save(context),
+                  icon: const Icon(Icons.bookmark_add_outlined, size: 18),
+                  label: const Text('Kaydet'),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Beğendim (favorilere ekle)',
+                icon: const Icon(Icons.favorite_border),
+                color: AppColors.slate,
+                onPressed: () => _favorite(context),
+              ),
+            ],
           ),
         ],
       ),
     );
+  }
+
+  /// Öneriyi hemen giydim olarak kaydeder; puan/amaç geri bildirim açılır.
+  Future<void> _worn(BuildContext context) async {
+    final ids = outfit.clothes.map((c) => c.id).toList();
+    final wear = context.read<WearProvider>();
+    final entry = await wear.log(clothingIds: ids);
+    if (!context.mounted) return;
+    if (entry == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(wear.error ?? 'Giyim kaydedilemedi')),
+      );
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Giyildi olarak işaretlendi!'),
+        action: SnackBarAction(
+          label: 'Puan ver',
+          onPressed: () => showWearFeedbackSheet(context, entry),
+        ),
+      ),
+    );
+    await showWearFeedbackSheet(context, entry);
+  }
+
+  /// Beğendim: kombin favori olarak kaydedilir (tek hareketle).
+  Future<void> _favorite(BuildContext context) async {
+    final ids = outfit.clothes.map((c) => c.id).toList();
+    try {
+      await context.read<OutfitProvider>().saveOutfit(ids, isFavorite: true);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Favorilere eklendi!')),
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Hata: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _save(BuildContext context) async {
