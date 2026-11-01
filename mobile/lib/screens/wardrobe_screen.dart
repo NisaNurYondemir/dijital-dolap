@@ -4,6 +4,7 @@ import 'package:dijital_dolap/models/clothing_item.dart';
 import 'package:dijital_dolap/providers/clothing_provider.dart';
 import 'package:dijital_dolap/widgets/clothing_card.dart';
 import 'package:dijital_dolap/screens/add_clothing_screen.dart';
+import 'package:dijital_dolap/screens/dashboard_screen.dart';
 import 'package:dijital_dolap/screens/edit_clothing_screen.dart';
 import 'package:dijital_dolap/models/clothing_categories.dart';
 
@@ -48,7 +49,18 @@ class _WardrobeScreenState extends State<WardrobeScreen> {
         : all.where((i) => i.category == selected).toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Dolabım')),
+      appBar: AppBar(
+        title: const Text('Dolabım'),
+        actions: [
+          IconButton(
+            tooltip: 'Dolap özeti',
+            icon: const Icon(Icons.donut_small_outlined),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const DashboardScreen()),
+            ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         heroTag: 'wardrobe_fab',
         onPressed: () {
