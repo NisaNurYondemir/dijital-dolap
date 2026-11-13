@@ -23,7 +23,7 @@ class DashboardProvider extends ChangeNotifier {
       _error = null;
     } catch (_) {
       _data = null;
-      _error = 'Dolapözeti yüklenemedi';
+      _error = 'Dolap özeti yüklenemedi';
     } finally {
       _loading = false;
       notifyListeners();

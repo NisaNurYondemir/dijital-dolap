@@ -7,6 +7,7 @@ import 'package:dijital_dolap/providers/calendar_provider.dart';
 import 'package:dijital_dolap/providers/weather_provider.dart';
 import 'package:dijital_dolap/providers/week_plan_provider.dart';
 import 'package:dijital_dolap/theme/app_theme.dart';
+import 'package:dijital_dolap/utils/error_text.dart';
 
 /// Takvim sekmesi: yaklaşan kıyafet gerektiren olaylar + hazırlık uyarıları.
 class CalendarScreen extends StatefulWidget {
@@ -56,7 +57,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
         child: p.loading && p.events.isEmpty
             ? const Center(child: CircularProgressIndicator())
             : p.error != null && p.events.isEmpty
-                ? Center(child: Text('Hata: ${p.error}'))
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Text(
+                        friendlyError(p.error),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  )
                 : _buildList(context, p, week),
       ),
     );

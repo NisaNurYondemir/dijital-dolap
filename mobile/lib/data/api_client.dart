@@ -62,52 +62,56 @@ class ApiClient {
 
   // ---------- HTTP metotları ----------
 
-  Future<dynamic> get(String path) async {
-    final res = await http.get(
-      Uri.parse('$baseUrl$path'),
-      headers: _headers(json: false),
-    );
-    return _handle(res);
+  /// Ağ hatalarını tek noktada yakalar: bağlantı yoksa ApiException(0).
+  Future<dynamic> _run(Future<dynamic> Function() body) async {
+    try {
+      return await body();
+    } on ApiException {
+      rethrow;
+    } catch (_) {
+      throw ApiException(
+        0,
+        'İnternet bağlantısı yok gibi görünüyor. Tekrar deneyebilirsin.',
+      );
+    }
   }
 
-  Future<dynamic> post(String path, {Map<String, dynamic>? body}) async {
-    final res = await http.post(
-      Uri.parse('$baseUrl$path'),
-      headers: _headers(),
-      body: body == null ? null : jsonEncode(body),
-    );
-    return _handle(res);
-  }
+  Future<dynamic> get(String path) =>
+      _run(() async => _handle(await http.get(
+            Uri.parse('$baseUrl$path'),
+            headers: _headers(json: false),
+          )));
+
+  Future<dynamic> post(String path, {Map<String, dynamic>? body}) =>
+      _run(() async => _handle(await http.post(
+            Uri.parse('$baseUrl$path'),
+            headers: _headers(),
+            body: body == null ? null : jsonEncode(body),
+          )));
 
   /// Form-data (login endpoint'i OAuth2PasswordRequestForm istiyor)
-  Future<dynamic> postForm(String path, Map<String, String> fields) async {
-    final res = await http.post(
-      Uri.parse('$baseUrl$path'),
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        if (hasToken) 'Authorization': 'Bearer $_token',
-      },
-      body: fields,
-    );
-    return _handle(res);
-  }
+  Future<dynamic> postForm(String path, Map<String, String> fields) =>
+      _run(() async => _handle(await http.post(
+            Uri.parse('$baseUrl$path'),
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              if (hasToken) 'Authorization': 'Bearer $_token',
+            },
+            body: fields,
+          )));
 
-  Future<dynamic> patch(String path, Map<String, dynamic> body) async {
-    final res = await http.patch(
-      Uri.parse('$baseUrl$path'),
-      headers: _headers(),
-      body: jsonEncode(body),
-    );
-    return _handle(res);
-  }
+  Future<dynamic> patch(String path, Map<String, dynamic> body) =>
+      _run(() async => _handle(await http.patch(
+            Uri.parse('$baseUrl$path'),
+            headers: _headers(),
+            body: jsonEncode(body),
+          )));
 
-  Future<dynamic> delete(String path) async {
-    final res = await http.delete(
-      Uri.parse('$baseUrl$path'),
-      headers: _headers(json: false),
-    );
-    return _handle(res);
-  }
+  Future<dynamic> delete(String path) =>
+      _run(() async => _handle(await http.delete(
+            Uri.parse('$baseUrl$path'),
+            headers: _headers(json: false),
+          )));
 
     /// Multipart dosya yükleme (fotoğraf için)
   Future<dynamic> uploadFile(
@@ -115,24 +119,25 @@ class ApiClient {
     String fieldName,
     List<int> fileBytes,
     String filename,
-  ) async {
-    final uri = Uri.parse('$baseUrl$path');
-    final request = http.MultipartRequest('POST', uri);
+  ) =>
+      _run(() async {
+        final uri = Uri.parse('$baseUrl$path');
+        final request = http.MultipartRequest('POST', uri);
 
-    if (hasToken) {
-      request.headers['Authorization'] = 'Bearer $_token';
-    }
+        if (hasToken) {
+          request.headers['Authorization'] = 'Bearer $_token';
+        }
 
-    request.files.add(http.MultipartFile.fromBytes(
-      fieldName,
-      fileBytes,
-      filename: filename,
-    ));
+        request.files.add(http.MultipartFile.fromBytes(
+          fieldName,
+          fileBytes,
+          filename: filename,
+        ));
 
-    final streamed = await request.send();
-    final res = await http.Response.fromStream(streamed);
-    return _handle(res);
-  }
+        final streamed = await request.send();
+        final res = await http.Response.fromStream(streamed);
+        return _handle(res);
+      });
 
   // ---------- Response handler ----------
 

@@ -4,6 +4,7 @@ import 'package:dijital_dolap/models/wear_entry.dart';
 import 'package:dijital_dolap/providers/occasion_provider.dart';
 import 'package:dijital_dolap/providers/wear_provider.dart';
 import 'package:dijital_dolap/theme/app_theme.dart';
+import 'package:dijital_dolap/utils/error_text.dart';
 import 'package:dijital_dolap/widgets/clothing_thumb.dart';
 import 'package:dijital_dolap/widgets/wear_feedback_sheet.dart';
 
@@ -109,18 +110,9 @@ class _WearHistoryScreenState extends State<WearHistoryScreen> {
       body: provider.loading && entries.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : provider.error != null && entries.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(provider.error!),
-                      const SizedBox(height: 12),
-                      ElevatedButton(
-                        onPressed: provider.load,
-                        child: const Text('Tekrar dene'),
-                      ),
-                    ],
-                  ),
+              ? _ErrorState(
+                  message: friendlyError(provider.error),
+                  onRetry: provider.load,
                 )
               : entries.isEmpty
                   ? const _EmptyHistory()
@@ -404,6 +396,41 @@ class _EmptyHistory extends StatelessWidget {
               '"Giydim" ile ilk kaydını oluşturabilirsin.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 13, color: AppColors.slate),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Hata + tekrar dene ekranı.
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off_outlined,
+                size: 44, color: AppColors.slate),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 14),
+            OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_outlined, size: 18),
+              label: const Text('Tekrar dene'),
             ),
           ],
         ),

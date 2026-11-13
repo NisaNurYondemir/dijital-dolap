@@ -11,6 +11,7 @@ import 'package:dijital_dolap/providers/weather_provider.dart';
 import 'package:dijital_dolap/theme/app_theme.dart';
 import 'package:dijital_dolap/widgets/clothing_thumb.dart';
 import 'package:dijital_dolap/widgets/occasion_picker_sheet.dart';
+import 'package:dijital_dolap/utils/error_text.dart';
 import 'package:dijital_dolap/widgets/wear_feedback_sheet.dart';
 
 class OutfitsScreen extends StatefulWidget {
@@ -421,7 +422,29 @@ class _SuggestionsTabState extends State<_SuggestionsTab> {
           child: p.suggestionsLoading
               ? const Center(child: CircularProgressIndicator())
               : p.suggestionsError != null
-                  ? Center(child: Text('Hata: ${p.suggestionsError}'))
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              friendlyError(p.suggestionsError),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 12),
+                            OutlinedButton.icon(
+                              onPressed: () => context
+                                  .read<OutfitProvider>()
+                                  .loadSuggestions(),
+                              icon: const Icon(Icons.refresh_outlined,
+                                  size: 18),
+                              label: const Text('Tekrar dene'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
                   : p.suggestions.isEmpty
                       ? Center(
                           child: Padding(
@@ -589,7 +612,7 @@ class _SuggestionCard extends StatelessWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hata: $e')),
+          SnackBar(content: Text(friendlyError(e))),
         );
       }
     }
@@ -612,7 +635,7 @@ class _SuggestionCard extends StatelessWidget {
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hata: $e')),
+          SnackBar(content: Text(friendlyError(e))),
         );
       }
     }
