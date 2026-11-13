@@ -1,8 +1,9 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import func
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -14,6 +15,13 @@ from models.occasion import OccasionGroup
 from models.user import User
 
 router = APIRouter(prefix="/insights", tags=["insights"])
+
+
+def color_hex(c) -> str:
+    h = int(c.hue) if c.hue is not None else 210
+    s = (c.saturation or 0) / 100.0
+    l = (c.lightness or 70) / 100.0
+    return f"hsl({h},{int(c.saturation or 0)}%,{int(c.lightness or 70)}%)"
 
 
 @router.get("/wardrobe")
@@ -30,12 +38,6 @@ def wardrobe_dashboard(
     dirty = sum(1 for c in clothes if c.is_dirty)
     ironing = sum(1 for c in clothes if c.needs_ironing)
     wearable = sum(1 for c in clothes if c.is_wearable)
-
-    def color_hex(c: Clothing) -> str:
-        h = int(c.hue) if c.hue is not None else 210
-        s = (c.saturation or 0) / 100.0
-        l = (c.lightness or 70) / 100.0
-        return f"hsl({h},{int(c.saturation or 0)}%,{int(c.lightness or 70)}%)"
 
     # Mevsim dağılımı
     season_counts: dict[str, int] = {}
@@ -201,4 +203,79 @@ def wardrobe_dashboard(
         "never_worn": never_worn,
         "occasion_usage": occasion_usage,
         "insight_lines": insight_lines,
+    }
+
+
+def _plan_dict(plan) -> dict:
+    return {
+        "event_id": plan.event_id,
+        "title": plan.title,
+        "kind": plan.kind,
+        "event_date": plan.event_date,
+        "days_left": plan.days_left,
+        "weather_headline": plan.weather_headline,
+        "needs_outerwear": plan.needs_outerwear,
+        "item_ids": plan.item_ids,
+        "message": plan.message,
+    }
+
+
+@router.get("/week")
+def week_plan(
+    lat: Optional[float] = Query(None, ge=-90, le=90),
+    lon: Optional[float] = Query(None, ge=-180, le=180),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Önümüzdeki 7 gün: yaklaşan olaylar + hava + hazır set önerisi.
+
+    lat/lon verilirse olay günleri için Open-Meteo günlük tahmin
+    alınır; servis başarısızsa plan hava bilgisi olmadan devam eder.
+    """
+    from datetime import datetime, timezone
+
+    from models.calendar_event import CalendarEvent
+    from week import build_week_plan
+    from weather import WeatherError, fetch_daily_forecast
+
+    now = datetime.now(timezone.utc)
+    events = (
+        db.query(CalendarEvent)
+        .filter(
+            CalendarEvent.user_id == current_user.id,
+            CalendarEvent.event_date >= now,
+            CalendarEvent.event_date <= now + timedelta(days=8),
+        )
+        .all()
+    )
+    clothes = (
+        db.query(Clothing).filter(Clothing.user_id == current_user.id).all()
+    )
+
+    forecast_by_date: dict[str, object] = {}
+    if lat is not None and lon is not None:
+        try:
+            forecast_by_date = {
+                f.date: f for f in fetch_daily_forecast(lat, lon, days=8)
+            }
+        except WeatherError:
+            forecast_by_date = {}
+
+    plans = build_week_plan(events, clothes, now, forecast_by_date)
+    items_by_id = {c.id: c for c in clothes}
+    return {
+        "generated_at": now,
+        "has_forecast": bool(forecast_by_date),
+        "plans": [_plan_dict(p) for p in plans],
+        "items": [
+            {
+                "id": items_by_id[i].id,
+                "category": items_by_id[i].category,
+                "color_name": items_by_id[i].color_name,
+                "color": color_hex(items_by_id[i]),
+                "image_path": items_by_id[i].image_path,
+            }
+            for i in sorted({i for p in plans for i in p.item_ids})
+            if i in items_by_id
+        ],
     }

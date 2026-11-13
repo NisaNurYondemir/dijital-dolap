@@ -12,6 +12,7 @@ import 'package:dijital_dolap/providers/wear_provider.dart';
 import 'package:dijital_dolap/providers/weather_provider.dart';
 import 'package:dijital_dolap/providers/calendar_provider.dart';
 import 'package:dijital_dolap/providers/dashboard_provider.dart';
+import 'package:dijital_dolap/providers/week_plan_provider.dart';
 import 'package:dijital_dolap/screens/home_screen.dart';
 import 'package:dijital_dolap/screens/login_screen.dart';
 import 'package:dijital_dolap/theme/app_theme.dart';
@@ -42,6 +43,7 @@ class _DijitalDolapAppState extends State<DijitalDolapApp> {
   late final WeatherProvider _weather;
   late final CalendarProvider _calendar;
   late final DashboardProvider _dashboard;
+  late final WeekPlanProvider _weekPlan;
 
   @override
   void initState() {
@@ -54,6 +56,7 @@ class _DijitalDolapAppState extends State<DijitalDolapApp> {
     _weather = WeatherProvider();
     _calendar = CalendarProvider();
     _dashboard = DashboardProvider();
+    _weekPlan = WeekPlanProvider();
 
     // Token süresi dolunca (401) oturumu ve önceki hesabın verisini temizle.
     ApiClient.instance.onUnauthorized = _handleUnauthorized;
@@ -69,6 +72,7 @@ class _DijitalDolapAppState extends State<DijitalDolapApp> {
     _weather.clearCity();
     _calendar.clear();
     _dashboard.clear();
+    _weekPlan.clear();
     _auth.logout();
   }
 
@@ -83,6 +87,7 @@ class _DijitalDolapAppState extends State<DijitalDolapApp> {
     _weather.dispose();
     _calendar.dispose();
     _dashboard.dispose();
+    _weekPlan.dispose();
     super.dispose();
   }
 
@@ -98,6 +103,7 @@ class _DijitalDolapAppState extends State<DijitalDolapApp> {
         ChangeNotifierProvider.value(value: _weather),
         ChangeNotifierProvider.value(value: _calendar),
         ChangeNotifierProvider.value(value: _dashboard),
+        ChangeNotifierProvider.value(value: _weekPlan),
       ],
       child: MaterialApp(
         title: 'Dijital Dolap',

@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:dijital_dolap/data/api_client.dart';
 import 'package:dijital_dolap/models/calendar.dart';
+import 'package:dijital_dolap/models/week_plan.dart';
 import 'package:dijital_dolap/providers/calendar_provider.dart';
+import 'package:dijital_dolap/providers/weather_provider.dart';
+import 'package:dijital_dolap/providers/week_plan_provider.dart';
 import 'package:dijital_dolap/theme/app_theme.dart';
 
 /// Takvim sekmesi: yaklaşan kıyafet gerektiren olaylar + hazırlık uyarıları.
@@ -18,12 +22,18 @@ class _CalendarScreenState extends State<CalendarScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<CalendarProvider>().loadAll();
+      final city = context.read<WeatherProvider>().city;
+      context.read<WeekPlanProvider>().load(
+            latitude: city?.latitude,
+            longitude: city?.longitude,
+          );
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final p = context.watch<CalendarProvider>();
+    final week = context.watch<WeekPlanProvider>();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Takvim')),
@@ -32,29 +42,64 @@ class _CalendarScreenState extends State<CalendarScreen> {
         icon: const Icon(Icons.event_available),
         label: const Text('Olay ekle'),
       ),
-      body: p.loading
-          ? const Center(child: CircularProgressIndicator())
-          : p.error != null
-              ? Center(child: Text('Hata: ${p.error}'))
-              : p.events.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Text(
-                          'Yaklaşan bir olay yok. Düğün, nişan veya özel bir\n'
-                          'gün için hatırlatıcı ekleyebilirsin.',
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-                      itemCount: p.events.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 12),
-                      itemBuilder: (_, i) =>
-                          _EventTile(event: p.events[i], onEdit: () => _editEvent(
-                              context, existing: p.events[i])),
-                    ),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          final city = context.read<WeatherProvider>().city;
+          await Future.wait([
+            context.read<CalendarProvider>().loadAll(),
+            context.read<WeekPlanProvider>().load(
+                  latitude: city?.latitude,
+                  longitude: city?.longitude,
+                ),
+          ]);
+        },
+        child: p.loading && p.events.isEmpty
+            ? const Center(child: CircularProgressIndicator())
+            : p.error != null && p.events.isEmpty
+                ? Center(child: Text('Hata: ${p.error}'))
+                : _buildList(context, p, week),
+      ),
+    );
+  }
+
+  Widget _buildList(
+    BuildContext context,
+    CalendarProvider p,
+    WeekPlanProvider week,
+  ) {
+    final plans = week.plansSafe;
+    if (p.events.isEmpty && plans.isEmpty) {
+      return ListView(
+        children: const [
+          SizedBox(height: 120),
+          Center(
+            child: Padding(
+              padding: EdgeInsets.all(32),
+              child: Text(
+                'Yaklaşan bir olay yok. Düğün, nişan veya özel bir\n'
+                'gün için hatırlatıcı ekleyebilirsin.',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+      itemCount: p.events.length + (plans.isNotEmpty ? 1 : 0),
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
+      itemBuilder: (_, i) {
+        if (plans.isNotEmpty && i == 0) {
+          return _WeekPlanSection(result: week.data!);
+        }
+        final index = i - (plans.isNotEmpty ? 1 : 0);
+        return _EventTile(
+          event: p.events[index],
+          onEdit: () =>
+              _editEvent(context, existing: p.events[index]),
+        );
+      },
     );
   }
 
@@ -87,6 +132,140 @@ const _kinds = <String, String>{
   'dogum_gunu': 'Doğum günü',
   'genel': 'Genel',
 };
+
+/// Hafta planı: yaklaşan olaylar için hava + hazır set kartı.
+class _WeekPlanSection extends StatelessWidget {
+  const _WeekPlanSection({required this.result});
+  final WeekPlanResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8, left: 2),
+          child: Text(
+            'Önümüzdeki hafta',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+        ),
+        for (final plan in result.plans.take(4))
+          Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              gradient: AppColors.weatherGradient,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: const [
+                BoxShadow(
+                  color: AppColors.shadow,
+                  blurRadius: 10,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      plan.needsOuterwear
+                          ? Icons.ac_unit
+                          : Icons.event_outlined,
+                      size: 20,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${plan.daysLeft} gün sonra: ${plan.title}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                            ),
+                          ),
+                          if (plan.weatherHeadline != null)
+                            Text(
+                              plan.weatherHeadline!,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.85),
+                                fontSize: 12,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    // Hazır set görselleri
+                    Row(
+                      children: [
+                        for (final id in plan.itemIds)
+                          if (_imagePathOf(result, id) != null)
+                            Container(
+                              margin: const EdgeInsets.only(left: 5),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8),
+                                color: Colors.white.withValues(alpha: 0.9),
+                              ),
+                              padding: const EdgeInsets.all(2),
+                              child: SizedBox(
+                                width: 40,
+                                height: 40,
+                                child: _PlanThumb(_imagePathOf(result, id)!),
+                              ),
+                            ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  plan.message,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.92),
+                    fontSize: 12.5,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  String? _imagePathOf(WeekPlanResult result, int id) {
+    final img = result.item(id)?.imagePath;
+    if (img == null || img.isEmpty) return null;
+    return '${ApiClient.baseUrl}/'
+        '${img.replaceAll('\\', '/').replaceFirst(RegExp('^/'), '')}';
+  }
+}
+
+class _PlanThumb extends StatelessWidget {
+  const _PlanThumb(this.url);
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      errorBuilder: (_, _, _) => Container(
+        color: AppColors.chalk,
+        child: const Icon(Icons.checkroom, size: 16, color: AppColors.slate),
+      ),
+    );
+  }
+}
 
 class _EventTile extends StatelessWidget {
   const _EventTile({required this.event, required this.onEdit});

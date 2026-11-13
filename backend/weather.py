@@ -109,6 +109,72 @@ class WeatherSummary:
         return f"{self.description}, {self.temperature_c:.0f}°C"
 
 
+@dataclass
+class DayForecast:
+    """Belirli bir gün için Open-Meteo günlük tahmini."""
+
+    date: str                     # "2026-11-03"
+    max_c: float
+    min_c: float
+    code: int
+    description: str
+
+    @property
+    def is_rainy_snowy(self) -> bool:
+        return (
+            self.code in _RAIN_CODES
+            or self.code in _SNOW_CODES
+            or self.code in _STORM_CODES
+        )
+
+    @property
+    def needs_outerwear(self) -> bool:
+        """Günün en-soğuk anına göre mont/ceket hatırlatması."""
+        return self.min_c < 14 or (self.is_rainy_snowy and self.max_c < 18)
+
+    def headline(self) -> str:
+        return f"{self.description}, {self.min_c:.0f}–{self.max_c:.0f}°C"
+
+
+def fetch_daily_forecast(lat: float, lon: float, days: int = 7,
+                         timeout: float = 8.0) -> list[DayForecast]:
+    """lat/lon için gün gün tahmin listesi döner (index 0 = bugün)."""
+    params = urllib.parse.urlencode({
+        "latitude": lat,
+        "longitude": lon,
+        "daily": "temperature_2m_max,temperature_2m_min,weather_code",
+        "forecast_days": max(1, min(int(days), 16)),
+    })
+    url = f"{FORECAST_URL}?{params}"
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as res:
+            data = json.load(res)
+    except Exception as exc:
+        raise WeatherError(f"Tahmin servisine ulaşılamadı: {exc}") from exc
+    daily = data.get("daily") or {}
+    dates = daily.get("time") or []
+    tmax = daily.get("temperature_2m_max") or []
+    tmin = daily.get("temperature_2m_min") or []
+    codes = daily.get("weather_code") or []
+    forecast: list[DayForecast] = []
+    for i, date in enumerate(dates):
+        try:
+            forecast.append(DayForecast(
+                date=str(date),
+                max_c=float(tmax[i]),
+                min_c=float(tmin[i]),
+                code=int(codes[i]) if i < len(codes) else 0,
+                description=describe_weather_code(
+                    int(codes[i]) if i < len(codes) else 0
+                ),
+            ))
+        except (TypeError, ValueError, IndexError):
+            continue
+    if not forecast:
+        raise WeatherError("Tahmin yanıtı eksik")
+    return forecast
+
+
 def fetch_weather(lat: float, lon: float, city: Optional[str] = None,
                   timeout: float = 8.0) -> WeatherSummary:
     params = urllib.parse.urlencode({
