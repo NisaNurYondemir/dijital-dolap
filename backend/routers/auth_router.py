@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
@@ -11,8 +11,16 @@ from auth_validation import (
     validate_username,
 )
 from models.user import User
+from rate_limit import RateLimiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+# Login brute-force koruması: 15 dk içinde 5 hatalı deneme -> kilit.
+_login_limiter = RateLimiter(max_attempts=5, window_seconds=900)
+
+
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
 
 # --- Şemalar ---
 class RegisterRequest(BaseModel):
@@ -73,12 +81,27 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
     return {"id": user.id, "username": user.username, "email": user.email}
 
 @router.post("/login", response_model=TokenResponse)
-def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def login(
+    request: Request,
+    form: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+):
     email = normalize_email(form.username)
+    key = f"{_client_ip(request)}:{email}"
+
+    remaining = _login_limiter.blocked_for(key)
+    if remaining is not None:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "Çok fazla hatalı deneme. Lütfen birkaç dakika sonra tekrar dene.",
+        )
+
     user = db.query(User).filter(User.email == email).first()
     if not user or not verify_password(form.password, user.hashed_password):
+        _login_limiter.hit(key)
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "E-posta veya şifre hatalı")
 
+    _login_limiter.reset(key)
     token = create_access_token({"sub": str(user.id)})
     return {"access_token": token}
 
