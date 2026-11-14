@@ -4,15 +4,20 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func
-from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from auth import get_current_user, get_db
 from insights import build_wardrobe_insights
 from models.clothing import Clothing
-from models.outfit import WearHistory, wear_items
+from models.outfit import Outfit, WearHistory, wear_items
 from models.occasion import OccasionGroup
 from models.user import User
+from style_profile import (
+    StyleItem,
+    StyleOutfit,
+    StyleWear,
+    build_style_profile,
+)
 
 router = APIRouter(prefix="/insights", tags=["insights"])
 
@@ -203,6 +208,75 @@ def wardrobe_dashboard(
         "never_worn": never_worn,
         "occasion_usage": occasion_usage,
         "insight_lines": insight_lines,
+    }
+
+
+@router.get("/style")
+def style_profile_endpoint(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Kullanicinin giyim gecmisinden ogrenilmis tarz profili."""
+    user_id = current_user.id
+    clothes = db.query(Clothing).filter(Clothing.user_id == user_id).all()
+
+    items = [
+        StyleItem(
+            id=c.id,
+            category=c.category,
+            hue=c.hue,
+            saturation=c.saturation,
+            lightness=c.lightness,
+        )
+        for c in clothes
+    ]
+    wears = [
+        StyleWear(
+            clothing_ids=[c.id for c in w.clothes],
+            rating=w.rating,
+            worn_at=w.worn_at,
+        )
+        for w in db.query(WearHistory)
+        .options(selectinload(WearHistory.clothes))
+        .filter(WearHistory.user_id == user_id)
+        .all()
+    ]
+    outfits = [
+        StyleOutfit(
+            clothing_ids=[c.id for c in o.clothes],
+            is_favorite=o.is_favorite,
+        )
+        for o in db.query(Outfit)
+        .options(selectinload(Outfit.clothes))
+        .filter(Outfit.user_id == user_id)
+        .all()
+    ]
+
+    profile = build_style_profile(items, wears, outfits)
+    return {
+        "wear_total": profile.wear_total,
+        "confidence": profile.confidence,
+        "top_categories": [
+            {"name": c.name, "count": c.count, "share": round(c.share, 3)}
+            for c in profile.top_categories
+        ],
+        "hue_buckets": [
+            {
+                "bucket": b.bucket,
+                "label": b.label,
+                "count": b.count,
+                "share": round(b.share, 3),
+            }
+            for b in profile.hue_buckets
+        ],
+        "neutral_share": round(profile.neutral_share, 3),
+        "contrast": (
+            round(profile.contrast, 3)
+            if profile.contrast is not None
+            else None
+        ),
+        "signature_pair": profile.signature_pair,
+        "summary": profile.summary,
     }
 
 

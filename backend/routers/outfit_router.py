@@ -13,6 +13,14 @@ from models.user import User
 from schemas.clothing import ClothingOut, Season
 from schemas.outfit import OutfitCreate, OutfitOut, OutfitSuggestion, OutfitUpdate
 from suggestion import ItemHistory, PairHistory, WeatherContext, group_of, suggest_outfits
+from style_profile import (
+    StyleItem,
+    StyleOutfit,
+    StyleWear,
+    StyleWeights,
+    build_style_profile,
+    build_style_weights,
+)
 from weather import WeatherError, fetch_weather
 
 router = APIRouter(prefix="/outfits", tags=["outfits"])
@@ -165,6 +173,56 @@ def _wear_signals(
     return history, pairs
 
 
+def _style_profile_signals(
+    db: Session,
+    user: User,
+    clothes: list[Clothing],
+):
+    """Tarz profili icin DB'yi saf moda girdilerine cevirir."""
+    items = [
+        StyleItem(
+            id=c.id,
+            category=c.category,
+            hue=c.hue,
+            saturation=c.saturation,
+            lightness=c.lightness,
+        )
+        for c in clothes
+    ]
+    wears = [
+        StyleWear(
+            clothing_ids=[c.id for c in w.clothes],
+            rating=w.rating,
+            worn_at=w.worn_at,
+        )
+        for w in db.query(WearHistory)
+        .options(selectinload(WearHistory.clothes))
+        .filter(WearHistory.user_id == user.id)
+        .all()
+    ]
+    outfits = [
+        StyleOutfit(
+            clothing_ids=[c.id for c in o.clothes],
+            is_favorite=o.is_favorite,
+        )
+        for o in db.query(Outfit)
+        .options(selectinload(Outfit.clothes))
+        .filter(Outfit.user_id == user.id)
+        .all()
+    ]
+    return items, wears, outfits
+
+
+def _style_weights(
+    db: Session,
+    user: User,
+    clothes: list[Clothing],
+) -> Optional[StyleWeights]:
+    items, wears, outfits = _style_profile_signals(db, user, clothes)
+    profile = build_style_profile(items, wears, outfits)
+    return build_style_weights(profile)
+
+
 @router.get("/suggest", response_model=list[OutfitSuggestion])
 def suggest(
     season: Optional[Season] = None,
@@ -215,6 +273,7 @@ def suggest(
 
     clothes = db.query(Clothing).filter(Clothing.user_id == current_user.id).all()
     history, pairs = _wear_signals(db, current_user, occasion)
+    style = _style_weights(db, current_user, clothes)
 
     # Amaç seçiliyse ve o amaçla ilişkili yeterli parça varsa adayları daralt;
     # yoksa tüm dolaptan önererek yeni kullanıcıyı boş ekranla bırakma.
@@ -245,6 +304,7 @@ def suggest(
         pair_history=pairs or None,
         occasion_name=occasion.name if occasion else None,
         weather=weather_ctx,
+        style=style,
     )
     if not results and weather_season and season is None:
         # Hava filtresi dolabı sıfırladıysa mevsim kısıtını bırakır; hava
@@ -259,6 +319,7 @@ def suggest(
             pair_history=pairs or None,
             occasion_name=occasion.name if occasion else None,
             weather=weather_ctx,
+            style=style,
         )
     return [
         OutfitSuggestion(

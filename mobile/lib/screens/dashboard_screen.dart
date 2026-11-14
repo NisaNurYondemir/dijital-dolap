@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 import 'package:dijital_dolap/data/api_client.dart';
 import 'package:dijital_dolap/models/clothing_categories.dart';
 import 'package:dijital_dolap/models/dashboard.dart';
+import 'package:dijital_dolap/models/style_profile.dart';
 import 'package:dijital_dolap/providers/dashboard_provider.dart';
+import 'package:dijital_dolap/providers/style_profile_provider.dart';
 import 'package:dijital_dolap/theme/app_theme.dart';
 
 /// Dolap özeti: sayaçlar, mevsim/kategori dağılımı, en çok giyilenler,
@@ -21,6 +23,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<DashboardProvider>().load();
+      context.read<StyleProfileProvider>().load();
     });
   }
 
@@ -28,6 +31,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final p = context.watch<DashboardProvider>();
     final d = p.data;
+    final style = context.watch<StyleProfileProvider>().profile;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Dolap Özeti')),
@@ -50,15 +54,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 )
               : d == null
                   ? const SizedBox.shrink()
-                  : _DashboardView(d),
+                  : _DashboardView(d, style),
     );
   }
 }
 
 class _DashboardView extends StatelessWidget {
-  const _DashboardView(this.d);
+  const _DashboardView(this.d, this.style);
 
   final WardrobeDashboard d;
+  final StyleProfile? style;
 
   @override
   Widget build(BuildContext context) {
@@ -124,6 +129,11 @@ class _DashboardView extends StatelessWidget {
                 ],
               ),
             ),
+            const SizedBox(height: 18),
+          ],
+          // ── Tarz profili ────────────────────────────────────────────────
+          if (style != null) ...[
+            _StyleCard(style),
             const SizedBox(height: 18),
           ],
           // ── Sayaçlar ──────────────────────────────────────────────────────
@@ -457,6 +467,128 @@ class _NeverWornChip extends StatelessWidget {
                   size: 18, color: Colors.orange.shade700),
             ),
         ],
+      ),
+    );
+  }
+}
+
+
+/// Tarz profili karti: giyim gecmisinden ogrenilen tercihler.
+class _StyleCard extends StatelessWidget {
+  const _StyleCard(this.s);
+
+  final StyleProfile? s;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = s;
+    if (style == null) return const SizedBox.shrink();
+    final chips = <_Pill>[
+      for (final c in style.topCategories.take(3))
+        _Pill(
+          categoryLabel(c.name),
+          '%${(c.share * 100).round()}',
+        ),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.line.withValues(alpha: 0.7)),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.shadow,
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.auto_awesome_outlined,
+                  size: 18, color: AppColors.thread),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  style.confidenceLabel,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              Text(
+                style.wearTotal > 0 ? '${style.wearTotal} giyim' : 'yeni',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...style.summary.map(
+            (line) => Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('•  '),
+                  Expanded(
+                    child: Text(
+                      line,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (chips.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(spacing: 8, runSpacing: 8, children: chips),
+          ],
+          if (style.signaturePair != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              'İmza kombin: '
+              '${style.signaturePair!.top} + ${style.signaturePair!.alt}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _Pill extends StatelessWidget {
+  const _Pill(this.label, [this.badge]);
+  final String label;
+  final String? badge;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.chalk,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text.rich(
+        TextSpan(
+          text: label,
+          children: [
+            if (badge != null)
+              TextSpan(
+                text: '  $badge',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.thread,
+                ),
+              ),
+          ],
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
       ),
     );
   }

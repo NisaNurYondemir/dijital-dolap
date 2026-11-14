@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from color_engine import Color, score_outfit
+from style_profile import StyleWeights, hue_bucket, style_affinity
 
 MAX_PER_GROUP = 40   # her gruptan en fazla bu kadar parça değerlendirilir
 
@@ -225,6 +226,7 @@ def _reasons(
     occasion_name: Optional[str],
     now: datetime,
     weather: Optional[WeatherContext] = None,
+    style_aff: Optional[float] = None,
 ) -> list[str]:
     reasons: list[str] = []
     if weather is not None:
@@ -235,6 +237,9 @@ def _reasons(
         reasons.append("Renkler birbiriyle çok uyumlu")
     elif color_score >= 0.7:
         reasons.append("Renk uyumu iyi")
+
+    if style_aff is not None and style_aff >= 0.7:
+        reasons.append("Tarzına uygun parçalar")
 
     histories = []
     if history:
@@ -298,6 +303,7 @@ def suggest_outfits(
     occasion_name: Optional[str] = None,
     now: Optional[datetime] = None,
     weather: Optional[WeatherContext] = None,
+    style: Optional[StyleWeights] = None,
 ) -> list[Suggestion]:
     rng = rng or random.Random()
     now = now or datetime.now(timezone.utc)
@@ -351,9 +357,23 @@ def suggest_outfits(
                 for h in item_histories
             ) / len(outfit)
 
+        # Tarz kisisellestirmesi: parcanin kullanici tarzina uygunlugu
+        style_aff = None
+        if style is not None:
+            style_aff = sum(
+                style_affinity(
+                    item.category, item.hue, item.saturation, style
+                )
+                for item in outfit
+            ) / len(outfit)
+
         if not history and not pair_history and not use_occasion:
-            # Geçmiş yokken eski davranış korunur: yalnızca renk uyumu.
-            score = color
+            if style is not None:
+                # Gecmis sinyali yoksa tarz tek etken olarak kullanilir.
+                score = color * (0.85 + 0.15 * style_aff)
+            else:
+                # Geçmiş yokken eski davranış korunur: yalnızca renk uyumu.
+                score = color
         else:
             rotation = (
                 sum(_rotation_score(h, now) for h in item_histories)
@@ -361,12 +381,21 @@ def suggest_outfits(
                 if history
                 else 0.5
             )
-            preference = (
-                0.50 * item_pref
-                + 0.20 * pair_pref
-                + 0.15 * rotation
-                + 0.15 * affinity
-            )
+            if style is not None:
+                preference = (
+                    0.45 * item_pref
+                    + 0.18 * pair_pref
+                    + 0.12 * rotation
+                    + 0.10 * affinity
+                    + 0.15 * style_aff
+                )
+            else:
+                preference = (
+                    0.50 * item_pref
+                    + 0.20 * pair_pref
+                    + 0.15 * rotation
+                    + 0.15 * affinity
+                )
             score = color * (0.80 + 0.20 * preference)
         score = min(score, 1.0)
 
@@ -383,6 +412,7 @@ def suggest_outfits(
                     occasion_name,
                     now,
                     weather=weather,
+                    style_aff=style_aff,
                 ),
             )
         )
