@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -19,7 +19,8 @@ class _AddClothingScreenState extends State<AddClothingScreen> {
   final _colorNameCtrl = TextEditingController();
   final _picker = ImagePicker();
 
-  File? _image; // seçilen orijinal fotoğraf
+  XFile? _picked; // seçilen orijinal fotoğraf
+  Uint8List? _previewBytes; // seçim anında okunan baytlar (web uyumlu)
   AnalysisResult? _analysis; // analiz sonucu
   bool _analyzing = false;
   bool _saving = false;
@@ -44,8 +45,11 @@ class _AddClothingScreenState extends State<AddClothingScreen> {
     try {
       final picked = await _picker.pickImage(source: source);
       if (picked == null) return;
+      final bytes = await picked.readAsBytes();
+      if (!mounted) return;
       setState(() {
-        _image = File(picked.path);
+        _picked = picked;
+        _previewBytes = bytes;
         _analysis = null;
       });
       await _analyze();
@@ -55,13 +59,13 @@ class _AddClothingScreenState extends State<AddClothingScreen> {
   }
 
   Future<void> _analyze() async {
-    final image = _image;
-    if (image == null) return;
+    final picked = _picked;
+    final bytes = _previewBytes;
+    if (picked == null || bytes == null) return;
 
     setState(() => _analyzing = true);
     final provider = context.read<ClothingProvider>();
-    final bytes = await image.readAsBytes();
-    final filename = image.path.split(Platform.pathSeparator).last;
+    final filename = picked.name;
 
     final result = await provider.analyzeImage(bytes, filename);
     if (!mounted) return;
@@ -85,7 +89,8 @@ class _AddClothingScreenState extends State<AddClothingScreen> {
 
   void _reset() {
     setState(() {
-      _image = null;
+      _picked = null;
+      _previewBytes = null;
       _analysis = null;
       _colorNameCtrl.clear();
       _isDirty = false;
@@ -134,7 +139,7 @@ class _AddClothingScreenState extends State<AddClothingScreen> {
         padding: const EdgeInsets.all(20),
         children: [
           _PhotoBox(
-            image: _image,
+            previewBytes: _previewBytes,
             previewUrl: _analysis?.previewUrlFor(ApiClient.baseUrl),
             analyzing: _analyzing,
             onPickCamera: () => _pickImage(ImageSource.camera),
@@ -142,7 +147,7 @@ class _AddClothingScreenState extends State<AddClothingScreen> {
             onClear: _reset,
           ),
           const SizedBox(height: 20),
-          if (_image != null && !_analyzing && _analysis == null)
+          if (_picked != null && !_analyzing && _analysis == null)
             OutlinedButton.icon(
               onPressed: _analyze,
               icon: const Icon(Icons.refresh),
@@ -283,7 +288,7 @@ class _AddClothingScreenState extends State<AddClothingScreen> {
 
 class _PhotoBox extends StatelessWidget {
   const _PhotoBox({
-    required this.image,
+    required this.previewBytes,
     required this.previewUrl,
     required this.analyzing,
     required this.onPickCamera,
@@ -291,7 +296,7 @@ class _PhotoBox extends StatelessWidget {
     required this.onClear,
   });
 
-  final File? image;
+  final Uint8List? previewBytes;
   final String? previewUrl;
   final bool analyzing;
   final VoidCallback onPickCamera;
@@ -308,7 +313,7 @@ class _PhotoBox extends StatelessWidget {
         border: Border.all(color: AppColors.line),
       ),
       clipBehavior: Clip.antiAlias,
-      child: image == null
+      child: previewBytes == null
           ? Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -343,10 +348,10 @@ class _PhotoBox extends StatelessWidget {
                     previewUrl!,
                     fit: BoxFit.contain,
                     errorBuilder: (_, _, _) =>
-                        Image.file(image!, fit: BoxFit.contain),
+                        Image.memory(previewBytes!, fit: BoxFit.contain),
                   )
                 else
-                  Image.file(image!, fit: BoxFit.contain),
+                  Image.memory(previewBytes!, fit: BoxFit.contain),
                 if (analyzing)
                   Container(
                     color: Colors.black45,
