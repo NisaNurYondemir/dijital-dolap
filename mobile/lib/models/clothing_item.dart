@@ -12,6 +12,7 @@ class ClothingItem {
   final bool isDirty;
   final bool needsIroning;
   final bool isIroned;
+  final int wearCountSinceWash; // son yıkamadan beri giyilme sayısı
   final String? imagePath;         // "uploads/xxx.png"
   final DateTime createdAt;
 
@@ -27,6 +28,7 @@ class ClothingItem {
     required this.isDirty,
     required this.needsIroning,
     required this.isIroned,
+    this.wearCountSinceWash = 0,
     this.imagePath,
     required this.createdAt,
   });
@@ -45,6 +47,7 @@ class ClothingItem {
       isDirty: json['is_dirty'] as bool,
       needsIroning: json['needs_ironing'] as bool,
       isIroned: json['is_ironed'] as bool,
+      wearCountSinceWash: json['wear_count_since_wash'] as int? ?? 0,
       imagePath: json['image_path'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
     );

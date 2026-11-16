@@ -12,6 +12,7 @@ import 'package:dijital_dolap/providers/wear_provider.dart';
 import 'package:dijital_dolap/providers/weather_provider.dart';
 import 'package:dijital_dolap/providers/calendar_provider.dart';
 import 'package:dijital_dolap/providers/dashboard_provider.dart';
+import 'package:dijital_dolap/providers/laundry_provider.dart';
 import 'package:dijital_dolap/providers/week_plan_provider.dart';
 import 'package:dijital_dolap/providers/style_profile_provider.dart';
 import 'package:dijital_dolap/screens/home_screen.dart';
@@ -44,6 +45,7 @@ class _DijitalDolapAppState extends State<DijitalDolapApp> {
   late final WeatherProvider _weather;
   late final CalendarProvider _calendar;
   late final DashboardProvider _dashboard;
+  late final LaundryProvider _laundry;
   late final WeekPlanProvider _weekPlan;
   late final StyleProfileProvider _style;
 
@@ -58,6 +60,7 @@ class _DijitalDolapAppState extends State<DijitalDolapApp> {
     _weather = WeatherProvider();
     _calendar = CalendarProvider();
     _dashboard = DashboardProvider();
+    _laundry = LaundryProvider();
     _weekPlan = WeekPlanProvider();
     _style = StyleProfileProvider();
 
@@ -75,6 +78,7 @@ class _DijitalDolapAppState extends State<DijitalDolapApp> {
     _weather.clearCity();
     _calendar.clear();
     _dashboard.clear();
+    _laundry.clear();
     _weekPlan.clear();
     _style.clear();
     _auth.logout();
@@ -91,6 +95,7 @@ class _DijitalDolapAppState extends State<DijitalDolapApp> {
     _weather.dispose();
     _calendar.dispose();
     _dashboard.dispose();
+    _laundry.dispose();
     _weekPlan.dispose();
     _style.dispose();
     super.dispose();
@@ -108,6 +113,7 @@ class _DijitalDolapAppState extends State<DijitalDolapApp> {
         ChangeNotifierProvider.value(value: _weather),
         ChangeNotifierProvider.value(value: _calendar),
         ChangeNotifierProvider.value(value: _dashboard),
+        ChangeNotifierProvider.value(value: _laundry),
         ChangeNotifierProvider.value(value: _weekPlan),
         ChangeNotifierProvider.value(value: _style),
       ],

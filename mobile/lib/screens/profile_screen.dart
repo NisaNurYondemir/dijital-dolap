@@ -5,6 +5,7 @@ import 'package:dijital_dolap/providers/clothing_provider.dart';
 import 'package:dijital_dolap/providers/occasion_provider.dart';
 import 'package:dijital_dolap/providers/outfit_provider.dart';
 import 'package:dijital_dolap/providers/wear_provider.dart';
+import 'package:dijital_dolap/screens/laundry_screen.dart';
 import 'package:dijital_dolap/screens/occasion_groups_screen.dart';
 import 'package:dijital_dolap/theme/app_theme.dart';
 
@@ -199,15 +200,31 @@ class ProfileScreen extends StatelessWidget {
           const _SectionTitle('Tercihler'),
           _Panel(
             padding: EdgeInsets.zero,
-            child: _NavTile(
-              icon: Icons.local_offer_outlined,
-              title: 'Amaç grupları',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const OccasionGroupsScreen(),
+            child: Column(
+              children: [
+                _NavTile(
+                  icon: Icons.local_laundry_service_outlined,
+                  title: 'Çamaşır',
+                  subtitle: '$dirty parça kirli',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const LaundryScreen(),
+                    ),
+                  ),
                 ),
-              ),
+                const Divider(height: 1, color: AppColors.line),
+                _NavTile(
+                  icon: Icons.local_offer_outlined,
+                  title: 'Amaç grupları',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const OccasionGroupsScreen(),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 24),
@@ -338,10 +355,12 @@ class _NavTile extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.onTap,
+    this.subtitle,
   });
 
   final IconData icon;
   final String title;
+  final String? subtitle;
   final VoidCallback onTap;
 
   @override
@@ -350,6 +369,9 @@ class _NavTile extends StatelessWidget {
       onTap: onTap,
       leading: Icon(icon, color: AppColors.ink),
       title: Text(title),
+      subtitle: subtitle == null
+          ? null
+          : Text(subtitle!, style: const TextStyle(fontSize: 12)),
       trailing: const Icon(Icons.chevron_right, color: AppColors.slate),
     );
   }
