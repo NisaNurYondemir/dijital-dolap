@@ -588,14 +588,10 @@ class _SuggestionCard extends StatelessWidget {
       );
       return;
     }
+    // Puanlama ekranı hemen açılır; bildirim sadece onay verir
+    // (bildirim butonu web'de güvenilir çalışmadığı için aksiyon yok).
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Giyildi olarak işaretlendi!'),
-        action: SnackBarAction(
-          label: 'Puan ver',
-          onPressed: () => showWearFeedbackSheet(context, entry),
-        ),
-      ),
+      const SnackBar(content: Text('Giyildi olarak işaretlendi!')),
     );
     await showWearFeedbackSheet(context, entry);
   }
@@ -623,15 +619,12 @@ class _SuggestionCard extends StatelessWidget {
     try {
       final created = await context.read<OutfitProvider>().saveOutfit(ids);
       if (!context.mounted) return;
+      // Grup seçme ekranı hemen açılır; bildirim butonu web'de
+      // güvenilir çalışmadığı için aksiyonsuz onay gösterilir.
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Kombin kaydedildi!'),
-          action: SnackBarAction(
-            label: 'Grupla',
-            onPressed: () => showOccasionPicker(context, created),
-          ),
-        ),
+        const SnackBar(content: Text('Kombin kaydedildi!')),
       );
+      await showOccasionPicker(context, created);
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
