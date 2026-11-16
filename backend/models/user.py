@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, func
+from sqlalchemy import Column, Integer, String, DateTime, JSON, func
 from database import Base
 from sqlalchemy.orm import relationship
 
@@ -10,6 +10,9 @@ class User(Base):
     username   = Column(String, unique=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Çamaşır ayarları: {"<kategori>": {"enabled": bool, "wear_limit": int|null}}
+    laundry_rules = Column(JSON, nullable=True)
 
   
     # class içine:

@@ -5,6 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 
 from auth import get_db, get_current_user
+from laundry import rule_for, should_mark_dirty
 from models.clothing import Clothing
 from models.occasion import OccasionGroup
 from models.outfit import Outfit, WearHistory, wear_items
@@ -109,6 +110,13 @@ def log_wear(
     if req.worn_at is not None:
         entry.worn_at = req.worn_at
     entry.clothes = clothes
+
+    # Çamaşır takibi: giyilme sayacını artır, kurala göre otomatik kirli işaretle
+    for item in clothes:
+        item.wear_count_since_wash += 1
+        rule = rule_for(item.category, current_user.laundry_rules)
+        if should_mark_dirty(item.wear_count_since_wash, rule):
+            item.is_dirty = True
 
     db.add(entry)
     db.commit()

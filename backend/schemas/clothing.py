@@ -30,6 +30,13 @@ class ClothingUpdate(BaseModel):
     is_ironed: Optional[bool] = None
 
 
+class WashRequest(BaseModel):
+    """Çamaşır günü isteği: ya seçili parçalar ya da tüm kirli sepeti."""
+
+    clothing_ids: Optional[list[int]] = None
+    all_dirty: bool = False
+
+
 class ClothingOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -44,6 +51,7 @@ class ClothingOut(BaseModel):
     is_dirty: bool
     needs_ironing: bool
     is_ironed: bool
+    wear_count_since_wash: int = 0
     image_path: Optional[str]
     created_at: datetime
 

@@ -17,7 +17,7 @@ from clip_category import predict_category, predict_top_categories
 from image_processing import process_clothing_image
 from models.clothing import Clothing
 from models.user import User
-from schemas.clothing import ClothingCreate, ClothingOut, ClothingUpdate
+from schemas.clothing import ClothingCreate, ClothingOut, ClothingUpdate, WashRequest
 logger = logging.getLogger(__name__)
 
 # Çalıştırma klasöründen bağımsız: backend/uploads
@@ -229,14 +229,52 @@ def update_clothing(
             raise HTTPException(422, f"'{field}' alanı boş bırakılamaz")
         setattr(item, field, value)
 
+    # Manuel temiz işaretleme = yıkandı sayılır: giyilme sayacı sıfırlanır
+    if changes.get("is_dirty") is False:
+        item.wear_count_since_wash = 0
+
     db.commit()
     db.refresh(item)
     return item
 
 
+@router.post("/wash", response_model=list[ClothingOut])
+def wash_clothes(
+    req: WashRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Çamaşır günü: seçili (veya tüm kirli) parçaları yıkandı işaretler.
+
+    Yıkanan parçada is_dirty=False olur ve giyilme sayacı sıfırlanır;
+    ütü bayraklarına dokunulmaz.
+    """
+    query = db.query(Clothing).filter(
+        Clothing.user_id == current_user.id,
+        Clothing.is_dirty.is_(True),
+    )
+    if not req.all_dirty:
+        if not req.clothing_ids:
+            raise HTTPException(422, "Parça seçilmedi")
+        items = query.filter(Clothing.id.in_(req.clothing_ids)).all()
+        found_ids = {i.id for i in items}
+        missing = [i for i in req.clothing_ids if i not in found_ids]
+        if missing:
+            raise HTTPException(404, f"Kıyafet bulunamadı: {missing}")
+    else:
+        items = query.all()
+
+    for item in items:
+        item.is_dirty = False
+        item.wear_count_since_wash = 0
+    db.commit()
+    for item in items:
+        db.refresh(item)
+    return items
+
+
 @router.delete("/{item_id}", status_code=204)
-def delete_clothing(
-    item_id: int,
+def delete_clothing(    item_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

@@ -22,6 +22,9 @@ class Clothing(Base):
     is_dirty    = Column(Boolean, default=False)
     needs_ironing = Column(Boolean, default=False)
     is_ironed = Column(Boolean, nullable=False, default=False, server_default=false())
+    # Son yıkamadan beri kaç kez giyildi (kirli otomatiği bu sayıya bakar)
+    wear_count_since_wash = Column(Integer, nullable=False, default=0,
+                                   server_default="0")
 
     # Görsel
     image_path  = Column(String, nullable=True)   # sunucu diskindeki yol
