@@ -4,9 +4,8 @@ import colorsys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from rembg import remove
 from colorthief import ColorThief
-from image_processing import process_clothing_image, extract_dominant_color
+from image_processing import process_clothing_image, extract_dominant_color, remove_background
 
 IMG = os.path.join(os.path.dirname(__file__), "../test_clothing.jpg")
 OUT = os.path.join(os.path.dirname(__file__), "../test_output.png")
@@ -14,7 +13,7 @@ OUT = os.path.join(os.path.dirname(__file__), "../test_output.png")
 
 def test_background_removal():
     with open(IMG, "rb") as f:
-        output = remove(f.read())
+        output = remove_background(f.read())   # uygulamanin u2net session'i
     with open(OUT, "wb") as f:
         f.write(output)
     assert os.path.exists(OUT)
