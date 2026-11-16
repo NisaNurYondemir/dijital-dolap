@@ -56,7 +56,8 @@ class CalendarProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> create(CalendarEvent event) async {
+  /// Olayı oluşturur; başarılıysa oluşan olayı, başarısızsa null döner.
+  Future<CalendarEvent?> create(CalendarEvent event) async {
     try {
       final created = await _repo.create(event);
       _events = [..._events, created]..sort(
@@ -65,11 +66,11 @@ class CalendarProvider extends ChangeNotifier {
       _mutationError = null;
       notifyListeners();
       loadInsights();
-      return true;
+      return created;
     } catch (e) {
       _mutationError = _friendly(e);
       notifyListeners();
-      return false;
+      return null;
     }
   }
 

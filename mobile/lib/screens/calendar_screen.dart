@@ -8,6 +8,7 @@ import 'package:dijital_dolap/providers/weather_provider.dart';
 import 'package:dijital_dolap/providers/week_plan_provider.dart';
 import 'package:dijital_dolap/theme/app_theme.dart';
 import 'package:dijital_dolap/utils/error_text.dart';
+import 'package:dijital_dolap/widgets/event_outfits_sheet.dart';
 
 /// Takvim sekmesi: yaklaşan kıyafet gerektiren olaylar + hazırlık uyarıları.
 class CalendarScreen extends StatefulWidget {
@@ -114,17 +115,21 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
   Future<void> _editEvent(BuildContext context,
       {CalendarEvent? existing}) async {
-    final ok = await showDialog<bool>(
+    final ok = await showDialog<Object>(
       context: context,
       builder: (_) =>
           _EventDialog(existing: existing),
     );
-    if (ok == true && context.mounted) {
+    if (ok != null && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(existing == null
             ? 'Olay eklendi'
             : 'Olay güncellendi')),
       );
+      // Yeni olay için hemen kombin önerilerini göster
+      if (ok is CalendarEvent && context.mounted) {
+        await showEventOutfitsSheet(context, ok);
+      }
     }
   }
 }
@@ -369,6 +374,11 @@ class _EventTile extends StatelessWidget {
             ),
           ),
           IconButton(
+            icon: const Icon(Icons.auto_awesome_outlined),
+            tooltip: 'Kombin önerileri',
+            onPressed: () => showEventOutfitsSheet(context, event),
+          ),
+          IconButton(
             icon: const Icon(Icons.delete_outline),
             tooltip: 'Sil',
             onPressed: () {
@@ -440,7 +450,7 @@ class _EventDialogState extends State<_EventDialog> {
     }
   }
 
-  void _save() {
+  Future<void> _save() async {
     final title = _controller.text.trim();
     if (title.length < 2) return;
     final provider = context.read<CalendarProvider>();
@@ -452,13 +462,25 @@ class _EventDialogState extends State<_EventDialog> {
       occasionGroupId: widget.existing?.occasionGroupId,
       note: widget.existing?.note,
     );
-    final ok = widget.existing == null
-        ? provider.create(event)
-        : provider.update(event);
-    ok.then((_) {
-      if (!mounted) return;
-      Navigator.of(context, rootNavigator: true).pop(true);
-    });
+    final dynamic result;
+    if (widget.existing == null) {
+      result = await provider.create(event);
+      if (result == null) {
+        if (!mounted) return;
+        Navigator.of(context, rootNavigator: true).pop(false);
+        return;
+      }
+    } else {
+      final ok = await provider.update(event);
+      if (!ok) {
+        if (!mounted) return;
+        Navigator.of(context, rootNavigator: true).pop(false);
+        return;
+      }
+      result = true;
+    }
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop(result);
   }
 
   @override
