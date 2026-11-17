@@ -9,6 +9,7 @@ import 'package:dijital_dolap/providers/week_plan_provider.dart';
 import 'package:dijital_dolap/theme/app_theme.dart';
 import 'package:dijital_dolap/utils/error_text.dart';
 import 'package:dijital_dolap/widgets/event_outfits_sheet.dart';
+import 'package:dijital_dolap/widgets/mini_calendar.dart';
 
 /// Takvim sekmesi: yaklaşan kıyafet gerektiren olaylar + hazırlık uyarıları.
 class CalendarScreen extends StatefulWidget {
@@ -19,6 +20,8 @@ class CalendarScreen extends StatefulWidget {
 }
 
 class _CalendarScreenState extends State<CalendarScreen> {
+  static DateTime _dayOf(DateTime d) => DateTime(d.year, d.month, d.day);
+
   @override
   void initState() {
     super.initState();
@@ -80,8 +83,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final plans = week.plansSafe;
     if (p.events.isEmpty && plans.isEmpty) {
       return ListView(
+        padding: const EdgeInsets.all(16),
         children: const [
-          SizedBox(height: 120),
+          MiniCalendar(eventDates: {}),
+          SizedBox(height: 80),
           Center(
             child: Padding(
               padding: EdgeInsets.all(32),
@@ -97,13 +102,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-      itemCount: p.events.length + (plans.isNotEmpty ? 1 : 0),
+      itemCount: p.events.length + (plans.isNotEmpty ? 1 : 0) + 1,
       separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (_, i) {
-        if (plans.isNotEmpty && i == 0) {
+        if (i == 0) {
+          return MiniCalendar(
+            eventDates: p.events.map((e) => _dayOf(e.eventDate)).toSet(),
+          );
+        }
+        final i2 = i - 1;
+        if (plans.isNotEmpty && i2 == 0) {
           return _WeekPlanSection(result: week.data!);
         }
-        final index = i - (plans.isNotEmpty ? 1 : 0);
+        final index = i2 - (plans.isNotEmpty ? 1 : 0);
         return _EventTile(
           event: p.events[index],
           onEdit: () =>

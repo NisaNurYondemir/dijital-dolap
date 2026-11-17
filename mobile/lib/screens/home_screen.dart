@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:dijital_dolap/providers/calendar_provider.dart';
 import 'package:dijital_dolap/providers/occasion_provider.dart';
 import 'package:dijital_dolap/screens/calendar_screen.dart';
+import 'package:dijital_dolap/screens/home_tab_screen.dart';
 import 'package:dijital_dolap/screens/outfits_screen.dart';
 import 'package:dijital_dolap/screens/profile_screen.dart';
 import 'package:dijital_dolap/screens/wardrobe_screen.dart';
@@ -19,12 +20,13 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _index = 0;
 
-  static const _pages = <Widget>[
-    WardrobeScreen(),
-    OutfitsScreen(),
-    WearHistoryScreen(),
-    CalendarScreen(),
-    ProfileScreen(),
+  late final List<Widget> _pages = [
+    HomeTabScreen(onOpenSuggestions: () => _goTo(2)),
+    const WardrobeScreen(),
+    const OutfitsScreen(),
+    const WearHistoryScreen(),
+    const CalendarScreen(),
+    const ProfileScreen(),
   ];
 
   @override
@@ -56,7 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Material(
               color: Colors.red.shade50,
               child: InkWell(
-                onTap: () => _goTo(3),
+                onTap: () => _goTo(4),
                 child: ListTile(
                   dense: true,
                   leading: Icon(Icons.event_busy_outlined,
@@ -82,6 +84,11 @@ class _HomeScreenState extends State<HomeScreen> {
         selectedIndex: _index,
         onDestinationSelected: _goTo,
         destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Ana Sayfa',
+          ),
           NavigationDestination(
             icon: Icon(Icons.checkroom_outlined),
             selectedIcon: Icon(Icons.checkroom),
