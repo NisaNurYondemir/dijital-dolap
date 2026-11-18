@@ -64,7 +64,9 @@ class Outfit(Base):
 
     id         = Column(Integer, primary_key=True, index=True)
     user_id    = Column(Integer, ForeignKey("users.id"), nullable=False)
-    is_favorite = Column(Boolean, default=False, nullable=False)   # ← bunu ekle
+    is_favorite = Column(Boolean, default=False, nullable=False)
+    name        = Column(String(60), nullable=True)     # kullanıcı verirse
+    description = Column(String(300), nullable=True)    # serbest açıklama
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     owner    = relationship("User",     back_populates="outfits")
@@ -91,6 +93,10 @@ class WearHistory(Base):
 
     # Kullanıcı geri bildirimi
     rating     = Column(Integer, nullable=True)    # 1-5
+    # Sıcaklık hissi: -2 çok üşüdüm, -1 biraz üşüdüm, 0 tam ayarında,
+    # +1 biraz sıcakladım, +2 çok sıcakladım. Öneri motoru bu sinyalle
+    # kullanıcının üşüme/sıcaklama eğilimini öğrenir.
+    comfort    = Column(Integer, nullable=True)
     occasion   = Column(String, nullable=True)     # okul, iş, arkadaş, romantik...
     occasion_group_id = Column(
         Integer,

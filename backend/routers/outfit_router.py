@@ -12,6 +12,7 @@ from models.outfit import Outfit, WearHistory
 from models.user import User
 from schemas.clothing import ClothingOut, Season
 from schemas.outfit import OutfitCreate, OutfitOut, OutfitSuggestion, OutfitUpdate
+from schemas.wear import WearOut
 from suggestion import ItemHistory, PairHistory, WeatherContext, group_of, suggest_outfits
 from style_profile import (
     StyleItem,
@@ -21,7 +22,7 @@ from style_profile import (
     build_style_profile,
     build_style_weights,
 )
-from weather import WeatherError, fetch_weather
+from weather import WeatherError, fetch_weather, needs_outerwear_with_bias
 
 router = APIRouter(prefix="/outfits", tags=["outfits"])
 def get_owned_outfit(outfit_id: int, db: Session, user: User) -> Outfit:
@@ -81,7 +82,12 @@ def create_outfit(
 ):
     clothes = resolve_clothes(req.clothing_ids, db, current_user)
     groups = resolve_groups(req.occasion_ids, db, current_user)
-    outfit = Outfit(user_id=current_user.id, is_favorite=req.is_favorite)
+    outfit = Outfit(
+        user_id=current_user.id,
+        is_favorite=req.is_favorite,
+        name=req.name,
+        description=req.description,
+    )
     outfit.clothes = clothes
     outfit.groups = groups
     db.add(outfit)
@@ -223,6 +229,28 @@ def _style_weights(
     return build_style_weights(profile)
 
 
+def _thermal_bias(db: Session, user: User) -> Optional[float]:
+    """Kullanıcının sıcaklık hissi ortalaması (son giyimler, -2..+2).
+
+    comfort = -2 çok üşüdüm, 0 tam ayarında, +2 çok sıcakladım. Son
+    15 geri bildirim üzerinden hesaplanır; geri bildirim yoksa None.
+    """
+    rows = (
+        db.query(WearHistory.comfort)
+        .filter(
+            WearHistory.user_id == user.id,
+            WearHistory.comfort.isnot(None),
+        )
+        .order_by(WearHistory.worn_at.desc(), WearHistory.id.desc())
+        .limit(15)
+        .all()
+    )
+    values = [row[0] for row in rows]
+    if not values:
+        return None
+    return sum(values) / len(values)
+
+
 @router.get("/suggest", response_model=list[OutfitSuggestion])
 def suggest(
     season: Optional[Season] = None,
@@ -258,6 +286,7 @@ def suggest(
 
     weather_ctx: Optional[WeatherContext] = None
     weather_season: Optional[str] = None
+    bias = _thermal_bias(db, current_user)
     if lat is not None and lon is not None:
         try:
             summary = fetch_weather(lat, lon, city=city)
@@ -265,10 +294,16 @@ def suggest(
             summary = None
         if summary is not None:
             weather_season = summary.season_hint
+            note: Optional[str] = None
+            if bias is not None and bias <= -0.5:
+                note = "Buz gibi günlerde üşüyorsun; kalın parçalar iyi gelir"
+            elif bias is not None and bias >= 0.5:
+                note = "Sıcaklarda terlediğin oluyor; hafif parçalar iyi gelir"
             weather_ctx = WeatherContext(
                 headline=summary.headline(),
-                needs_outerwear=summary.needs_outerwear,
+                needs_outerwear=needs_outerwear_with_bias(summary, bias),
                 rainy=summary.is_rainy_snowy,
+                comfort_note=note,
             )
 
     clothes = db.query(Clothing).filter(Clothing.user_id == current_user.id).all()
@@ -340,6 +375,28 @@ def get_outfit(
     return get_owned_outfit(outfit_id, db, current_user)
 
 
+@router.get("/{outfit_id}/history", response_model=list[WearOut])
+def get_outfit_history(
+    outfit_id: int,
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Kombinin giyim geçmişi: tarih, puan, sıcaklık hissi, hava bilgisi."""
+    get_owned_outfit(outfit_id, db, current_user)
+    return (
+        db.query(WearHistory)
+        .options(selectinload(WearHistory.clothes))
+        .filter(
+            WearHistory.outfit_id == outfit_id,
+            WearHistory.user_id == current_user.id,
+        )
+        .order_by(WearHistory.worn_at.desc(), WearHistory.id.desc())
+        .limit(limit)
+        .all()
+    )
+
+
 @router.patch("/{outfit_id}", response_model=OutfitOut)
 def update_outfit(
     outfit_id: int,
@@ -351,6 +408,13 @@ def update_outfit(
 
     if req.is_favorite is not None:
         outfit.is_favorite = req.is_favorite
+
+    changes = req.model_dump(exclude_unset=True)
+    changes.pop("is_favorite", None)
+    changes.pop("clothing_ids", None)
+    changes.pop("occasion_ids", None)
+    for field, value in changes.items():
+        setattr(outfit, field, value)
 
     if req.clothing_ids is not None:
         outfit.clothes = resolve_clothes(req.clothing_ids, db, current_user)

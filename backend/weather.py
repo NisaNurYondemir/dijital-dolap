@@ -109,6 +109,28 @@ class WeatherSummary:
         return f"{self.description}, {self.temperature_c:.0f}°C"
 
 
+# Kullanıcının sıcaklık hissi (comfort: -2..+2) mont eşiğini değiştirir.
+# Her 1 birimlik üşüme eğilimi eşeği 2°C yükseltir, sıcaklama eğilimi düşürür.
+OUTERWEAR_BIAS_STEP_C = 2.0
+OUTERWEAR_BIAS_MAX = 2.0
+
+
+def needs_outerwear_with_bias(summary: WeatherSummary,
+                              bias: Optional[float]) -> bool:
+    """Üşüme/sıcaklama geçmişine göre mont gerekip gerekmediği.
+
+    bias: son giyim kayıtlarındaki comfort ortalaması. Negatif (üşüyor)
+    eşiği yükseltir (daha erken mont), pozitif (sıcaklıyor) düşürür.
+    """
+    if bias is None:
+        return summary.needs_outerwear
+    shift = max(-OUTERWEAR_BIAS_MAX, min(OUTERWEAR_BIAS_MAX, bias))
+    shift *= OUTERWEAR_BIAS_STEP_C
+    if summary.is_rainy_snowy:
+        return summary.temperature_c < 18 - shift
+    return summary.temperature_c < 14 - shift
+
+
 @dataclass
 class DayForecast:
     """Belirli bir gün için Open-Meteo günlük tahmini."""

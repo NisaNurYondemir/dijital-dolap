@@ -65,6 +65,7 @@ class WearProvider extends ChangeNotifier {
   Future<bool> updateEntry(
     WearEntry entry, {
     int? rating,
+    int? comfort,
     String? occasion,
     int? occasionGroupId,
     String? note,
@@ -73,6 +74,7 @@ class WearProvider extends ChangeNotifier {
       final updated = await _repo.update(
         entry.id,
         rating: rating,
+        comfort: comfort,
         occasion: occasion,
         occasionGroupId: occasionGroupId,
         note: note,

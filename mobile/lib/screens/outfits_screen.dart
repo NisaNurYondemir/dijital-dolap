@@ -8,6 +8,7 @@ import 'package:dijital_dolap/providers/occasion_provider.dart';
 import 'package:dijital_dolap/providers/outfit_provider.dart';
 import 'package:dijital_dolap/providers/wear_provider.dart';
 import 'package:dijital_dolap/providers/weather_provider.dart';
+import 'package:dijital_dolap/screens/outfit_detail_screen.dart';
 import 'package:dijital_dolap/theme/app_theme.dart';
 import 'package:dijital_dolap/widgets/clothing_thumb.dart';
 import 'package:dijital_dolap/widgets/occasion_picker_sheet.dart';
@@ -479,7 +480,16 @@ class _SuggestionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
 
-    return Container(
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => OutfitDetailScreen(outfit: outfit),
+          ),
+        );
+      },
+      child: Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -571,7 +581,17 @@ class _SuggestionCard extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 6),
+          Text(
+            'Detay için dokun',
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.grey.shade500,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
         ],
+      ),
       ),
     );
   }
@@ -727,7 +747,16 @@ class _SavedOutfitCard extends StatelessWidget {
     final text = Theme.of(context).textTheme;
     final p = context.read<OutfitProvider>();
 
-    return Container(
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => OutfitDetailScreen(outfit: outfit),
+          ),
+        );
+      },
+      child: Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -793,6 +822,15 @@ class _SavedOutfitCard extends StatelessWidget {
               ),
             ],
           ),
+          if (outfit.description?.isNotEmpty == true) ...[
+            const SizedBox(height: 2),
+            Text(
+              outfit.description!,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: text.bodySmall?.copyWith(color: AppColors.slate),
+            ),
+          ],
           const SizedBox(height: 2),
           Wrap(
             spacing: 6,
@@ -812,6 +850,7 @@ class _SavedOutfitCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
       ),
     );
   }

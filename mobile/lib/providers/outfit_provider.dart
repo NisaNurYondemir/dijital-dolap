@@ -112,14 +112,38 @@ class OutfitProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> toggleFavorite(Outfit outfit) async {
-    if (outfit.id == null) return;
+  Future<Outfit> updateDetails(Outfit outfit, {String? name,
+      String? description}) async {
+    if (outfit.id == null) return outfit;
+    try {
+      final updated = await _repo.updateDetails(
+        outfit.id!,
+        name: name,
+        description: description,
+      );
+      final i = _outfits.indexWhere((o) => o.id == outfit.id);
+      if (i != -1) {
+        _outfits[i] = updated;
+        notifyListeners();
+      }
+      _mutationError = null;
+      return updated;
+    } catch (e) {
+      _mutationError = e.toString();
+      notifyListeners();
+      return outfit;
+    }
+  }
+
+  Future<Outfit> toggleFavorite(Outfit outfit) async {
+    if (outfit.id == null) return outfit;
     final updated = await _repo.toggleFavorite(outfit.id!, !outfit.isFavorite);
     final i = _outfits.indexWhere((o) => o.id == outfit.id);
     if (i != -1) {
       _outfits[i] = updated;
       notifyListeners();
     }
+    return updated;
   }
 
   Future<void> deleteOutfit(int id) async {

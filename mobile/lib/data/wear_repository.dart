@@ -16,6 +16,7 @@ class WearRepository {
     int? outfitId,
     List<int>? clothingIds,
     int? rating,
+    int? comfort,
     String? occasion,
     int? occasionGroupId,
     String? note,
@@ -26,6 +27,7 @@ class WearRepository {
       'outfit_id': ?outfitId,
       'clothing_ids': ?ids,
       'rating': ?rating,
+      'comfort': ?comfort,
       'occasion': ?occasion,
       'occasion_group_id': ?occasionGroupId,
       'note': ?note,
@@ -36,12 +38,14 @@ class WearRepository {
   Future<WearEntry> update(
     int id, {
     int? rating,
+    int? comfort,
     String? occasion,
     int? occasionGroupId,
     String? note,
   }) async {
     final res = await _api.patch('/wear/$id', {
       'rating': ?rating,
+      'comfort': ?comfort,
       'occasion': ?occasion,
       'occasion_group_id': ?occasionGroupId,
       'note': ?note,

@@ -99,6 +99,7 @@ def log_wear(
         user_id=current_user.id,
         outfit_id=outfit.id if outfit else None,
         rating=req.rating,
+        comfort=req.comfort,
         occasion=group.name if group else req.occasion,
         occasion_group_id=group.id if group else None,
         note=req.note,

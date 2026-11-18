@@ -100,6 +100,9 @@ class WeatherContext:
     headline: str                  # "yağmurlu, 12°C"
     needs_outerwear: bool = False
     rainy: bool = False
+    # Kullanıcının üşüme/sıcaklama geçmişinden üretilen not ("Üşümeye
+    # eğilimlisin; mont önerildi" gibi). None ise not eklenmez.
+    comfort_note: Optional[str] = None
 
 
 @dataclass
@@ -231,6 +234,8 @@ def _reasons(
     reasons: list[str] = []
     if weather is not None:
         reasons.append(f"Bugün hava: {weather.headline}")
+        if weather.comfort_note:
+            reasons.append(weather.comfort_note)
         if weather.needs_outerwear:
             reasons.append("Soğuk görünüyor; mont veya ceket iyi gelir")
     if color_score >= 0.85:

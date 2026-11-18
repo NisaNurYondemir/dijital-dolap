@@ -14,6 +14,7 @@ class WearCreate(BaseModel):
 
     worn_at: Optional[datetime] = None
     rating: Optional[int] = Field(None, ge=1, le=5)
+    comfort: Optional[int] = Field(None, ge=-2, le=2)
     occasion: Optional[str] = None
     occasion_group_id: Optional[int] = None
     note: Optional[str] = None
@@ -33,6 +34,7 @@ class WearCreate(BaseModel):
 
 class WearUpdate(BaseModel):
     rating: Optional[int] = Field(None, ge=1, le=5)
+    comfort: Optional[int] = Field(None, ge=-2, le=2)
     occasion: Optional[str] = None
     occasion_group_id: Optional[int] = None
     note: Optional[str] = None
@@ -55,6 +57,7 @@ class WearOut(BaseModel):
     outfit_id: Optional[int]
     worn_at: Optional[datetime]
     rating: Optional[int]
+    comfort: Optional[int]
     occasion: Optional[str]
     occasion_group_id: Optional[int]
     note: Optional[str]

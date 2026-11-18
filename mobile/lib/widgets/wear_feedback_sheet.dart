@@ -8,6 +8,16 @@ import 'package:dijital_dolap/widgets/occasion_group_dialog.dart';
 
 /// Giyim kaydından sonra isteğe bağlı puan + amaç sorar.
 /// "Atla" denirse kayıt olduğu gibi kalır; sonradan geçmişten düzenlenebilir.
+
+/// 5 seviyeli sıcaklık hissi: soldan sağa üşüme → ideal → sıcaklama.
+const _comfortLevels = [
+  (value: -2, emoji: '🥶', label: 'Çok üşüdüm'),
+  (value: -1, emoji: '❄️', label: 'Biraz üşüdüm'),
+  (value: 0, emoji: '👌', label: 'Tam ayarında'),
+  (value: 1, emoji: '☀️', label: 'Biraz sıcakladım'),
+  (value: 2, emoji: '🥵', label: 'Çok sıcakladım'),
+];
+
 Future<void> showWearFeedbackSheet(
   BuildContext context,
   WearEntry entry,
@@ -20,6 +30,7 @@ Future<void> showWearFeedbackSheet(
   if (!context.mounted) return;
 
   var rating = entry.rating ?? 0;
+  int? comfort = entry.comfort;
   int? selectedGroupId = entry.occasionGroupId;
   if (selectedGroupId == null && entry.occasion != null) {
     final name = entry.occasion!.toLowerCase();
@@ -98,6 +109,69 @@ Future<void> showWearFeedbackSheet(
                 ),
                 const SizedBox(height: 8),
                 const Text(
+                  'Sıcaklık hissi',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.slate,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  'Sol: üşüdüm · Orta: tam ayarında · Sağ: sıcakladım',
+                  style: TextStyle(fontSize: 12, color: AppColors.slate),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    for (final (index, level) in _comfortLevels.indexed)
+                      Expanded(
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => setSheet(() =>
+                              comfort = comfort == level.value
+                                  ? null
+                                  : level.value),
+                          child: Container(
+                            margin: EdgeInsets.symmetric(
+                              horizontal: index == 0 || index == 4 ? 0 : 3,
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: comfort == level.value
+                                  ? AppColors.thread.withValues(alpha: 0.16)
+                                  : Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: comfort == level.value
+                                    ? AppColors.thread
+                                    : Colors.transparent,
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                Text(level.emoji,
+                                    style: const TextStyle(fontSize: 18)),
+                                Text(
+                                  level.label,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    color: comfort == level.value
+                                        ? AppColors.ink
+                                        : AppColors.slate,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text(
                   'Amaç / ortam',
                   style: TextStyle(
                     fontSize: 13,
@@ -163,10 +237,12 @@ Future<void> showWearFeedbackSheet(
   if (saved == true) {
     final newRating = rating > 0 ? rating : null;
     if (newRating != entry.rating ||
+        comfort != entry.comfort ||
         selectedGroupId != entry.occasionGroupId) {
       await wear.updateEntry(
         entry,
         rating: newRating,
+        comfort: comfort,
         occasionGroupId: selectedGroupId,
       );
     }

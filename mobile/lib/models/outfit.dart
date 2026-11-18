@@ -5,6 +5,8 @@ class Outfit {
   final int? id;
   final int? userId;
   final bool isFavorite;
+  final String? name;
+  final String? description;
   final List<ClothingItem> clothes;
   final List<OccasionGroup> groups;
   final DateTime? createdAt;
@@ -16,6 +18,8 @@ class Outfit {
     this.id,
     this.userId,
     this.isFavorite = false,
+    this.name,
+    this.description,
     required this.clothes,
     this.groups = const [],
     this.createdAt,
@@ -30,6 +34,8 @@ class Outfit {
       id: json['id'] as int?,
       userId: json['user_id'] as int?,
       isFavorite: json['is_favorite'] as bool? ?? false,
+      name: json['name'] as String?,
+      description: json['description'] as String?,
       clothes: (json['clothes'] as List<dynamic>)
           .map((e) => ClothingItem.fromJson(e as Map<String, dynamic>))
           .toList(),
@@ -61,7 +67,30 @@ class Outfit {
     );
   }
 
-  String get displayName => id != null ? 'Kombin #$id' : 'Öneri';
+  /// Kaydedilmiş kombinin güncel hâliyle yeni bir kopya.
+  Outfit copyWith({
+    String? name,
+    String? description,
+    bool? isFavorite,
+  }) {
+    return Outfit(
+      id: id,
+      userId: userId,
+      isFavorite: isFavorite ?? this.isFavorite,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      clothes: clothes,
+      groups: groups,
+      createdAt: createdAt,
+      score: score,
+      colorScore: colorScore,
+      reasons: reasons,
+    );
+  }
+
+  String get displayName => name?.isNotEmpty == true
+      ? name!
+      : (id != null ? 'Kombin #$id' : 'Öneri');
 
   String get scoreLabel {
     final value = colorScore ?? score;
