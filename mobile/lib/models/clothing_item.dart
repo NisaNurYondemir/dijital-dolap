@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'palette_color.dart';
+
 class ClothingItem {
   final int id;                    // backend int
   final int userId;
@@ -9,6 +11,11 @@ class ClothingItem {
   final double? saturation;        // 0-100
   final double? lightness;         // 0-100
   final String? colorName;
+  final List<PaletteEntry> palette;
+  final String? pattern; // duz/cizgili/ekose/...
+  final String? patternScale; // ince/orta/iri/bilinmiyor
+  final double? patternConfidence;
+  final String? patternSource; // zero_shot/probe/manual
   final bool isDirty;
   final bool needsIroning;
   final bool isIroned;
@@ -25,6 +32,11 @@ class ClothingItem {
     this.saturation,
     this.lightness,
     this.colorName,
+    this.palette = const [],
+    this.pattern,
+    this.patternScale,
+    this.patternConfidence,
+    this.patternSource,
     required this.isDirty,
     required this.needsIroning,
     required this.isIroned,
@@ -44,6 +56,11 @@ class ClothingItem {
       saturation: (json['saturation'] as num?)?.toDouble(),
       lightness: (json['lightness'] as num?)?.toDouble(),
       colorName: json['color_name'] as String?,
+      palette: parsePalette(json['palette']),
+      pattern: json['pattern'] as String?,
+      patternScale: json['pattern_scale'] as String?,
+      patternConfidence: (json['pattern_confidence'] as num?)?.toDouble(),
+      patternSource: json['pattern_source'] as String?,
       isDirty: json['is_dirty'] as bool,
       needsIroning: json['needs_ironing'] as bool,
       isIroned: json['is_ironed'] as bool,

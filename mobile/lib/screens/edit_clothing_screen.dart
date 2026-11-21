@@ -20,6 +20,8 @@ class _EditClothingScreenState extends State<EditClothingScreen> {
   late final TextEditingController _colorNameCtrl;
   late String _category;
   late String _season;
+  String? _pattern;
+  String? _patternScale;
   late bool _isDirty;
   late bool _needsIroning;
   late bool _isIroned;
@@ -36,6 +38,8 @@ class _EditClothingScreenState extends State<EditClothingScreen> {
     _colorNameCtrl = TextEditingController(text: i.colorName ?? '');
     _category = i.category;
     _season = i.season;
+    _pattern = i.pattern;
+    _patternScale = i.patternScale;
     _isDirty = i.isDirty;
     _needsIroning = i.needsIroning;
     _isIroned = i.isIroned;
@@ -69,11 +73,16 @@ class _EditClothingScreenState extends State<EditClothingScreen> {
 
     setState(() => _saving = true);
     final name = _colorNameCtrl.text.trim();
+    final patternChanged = _pattern != widget.item.pattern ||
+        _patternScale != widget.item.patternScale;
 
     final updated = await provider.updateItem(widget.item.id, {
       'category': _category,
       'season': _season,
       'color_name': name.isEmpty ? null : name,
+      'pattern': _pattern,
+      'pattern_scale': _patternScale,
+      if (patternChanged) 'pattern_source': 'manual',
       'is_dirty': _isDirty,
       'needs_ironing': _needsIroning,
       'is_ironed': _needsIroning ? _isIroned : false,
@@ -224,6 +233,77 @@ class _EditClothingScreenState extends State<EditClothingScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          if (widget.item.palette.isNotEmpty) ...[
+            Text('Renk paleti', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final p in widget.item.palette)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppColors.line),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 16,
+                          height: 16,
+                          decoration: BoxDecoration(
+                            color: p.color,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.line),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text('${p.name ?? ''} %${p.percent}',
+                            style: Theme.of(context).textTheme.bodySmall),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 20),
+          ],
+          DropdownButtonFormField<String>(
+            key: ValueKey('pattern_$_pattern'),
+            initialValue: _pattern,
+            decoration: const InputDecoration(
+              labelText: 'Desen',
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.texture_outlined),
+            ),
+            items: [
+              for (final e in kPatternLabels.entries)
+                DropdownMenuItem(value: e.key, child: Text(e.value)),
+            ],
+            onChanged: _busy ? null : (v) => setState(() => _pattern = v),
+          ),
+          if (const {'cizgili', 'ekose', 'puantiyeli'}.contains(_pattern)) ...[
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              key: ValueKey('scale_$_patternScale'),
+              initialValue: _patternScale ?? 'bilinmiyor',
+              decoration: const InputDecoration(
+                labelText: 'Desen ölçeği',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.straighten),
+              ),
+              items: [
+                for (final e in kPatternScaleLabels.entries)
+                  DropdownMenuItem(value: e.key, child: Text(e.value)),
+              ],
+              onChanged:
+                  _busy ? null : (v) => setState(() => _patternScale = v),
+            ),
+          ],
           const SizedBox(height: 12),
           SwitchListTile(
             value: _isDirty,

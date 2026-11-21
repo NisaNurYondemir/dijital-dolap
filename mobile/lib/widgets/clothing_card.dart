@@ -10,6 +10,39 @@ class ClothingCard extends StatelessWidget {
   final ClothingItem item;
   final VoidCallback? onTap;
 
+  /// Palet varsa ilk üç rengi küçük noktalar olarak gösterir.
+  List<Widget> _paletteDots(Color fallback) {
+    if (item.palette.isEmpty) {
+      return [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: fallback,
+            shape: BoxShape.circle,
+            border: Border.all(color: AppColors.line),
+          ),
+        ),
+        const SizedBox(width: 6),
+      ];
+    }
+    return [
+      for (final p in item.palette.take(3)) ...[
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: p.color,
+            shape: BoxShape.circle,
+            border: Border.all(color: AppColors.line),
+          ),
+        ),
+        const SizedBox(width: 3),
+      ],
+      const SizedBox(width: 3),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final color = item.color ?? AppColors.line;
@@ -86,20 +119,16 @@ class ClothingCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Row(
                       children: [
-                        Container(
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            color: color,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: AppColors.line),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
+                        ..._paletteDots(color),
                         Expanded(
                           child: Text(
-                            item.colorName ??
-                                (kSeasonLabels[item.season] ?? item.season),
+                            [
+                              if (item.colorName != null) item.colorName!,
+                              if (item.pattern != null &&
+                                  item.pattern != 'duz' &&
+                                  item.pattern != 'bilinmiyor')
+                                patternLabel(item.pattern),
+                            ].join(' · '),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.bodySmall,

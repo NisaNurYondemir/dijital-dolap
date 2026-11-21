@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'palette_color.dart';
+
 /// CLIP'in önerdiği tek bir kategori adayı.
 class CategoryCandidate {
   final String category;
@@ -40,6 +42,11 @@ class AnalysisResult {
   final double? saturation;
   final double? lightness;
   final String? colorName;
+  final List<PaletteEntry> palette;
+  final String? pattern;
+  final String? patternScale;
+  final double? patternConfidence;
+  final String? patternSource;
 
   const AnalysisResult({
     required this.tempImage,
@@ -51,6 +58,11 @@ class AnalysisResult {
     this.saturation,
     this.lightness,
     this.colorName,
+    this.palette = const [],
+    this.pattern,
+    this.patternScale,
+    this.patternConfidence,
+    this.patternSource,
   });
 
   factory AnalysisResult.fromJson(Map<String, dynamic> json) {
@@ -67,6 +79,11 @@ class AnalysisResult {
       saturation: (json['saturation'] as num?)?.toDouble(),
       lightness: (json['lightness'] as num?)?.toDouble(),
       colorName: json['color_name'] as String?,
+      palette: parsePalette(json['palette']),
+      pattern: json['pattern'] as String?,
+      patternScale: json['pattern_scale'] as String?,
+      patternConfidence: (json['pattern_confidence'] as num?)?.toDouble(),
+      patternSource: json['pattern_source'] as String?,
     );
   }
 

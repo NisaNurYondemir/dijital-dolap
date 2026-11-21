@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:dijital_dolap/data/api_client.dart';
 import 'package:dijital_dolap/models/analysis_result.dart';
 import 'package:dijital_dolap/models/clothing_categories.dart';
+import 'package:dijital_dolap/models/palette_color.dart';
 import 'package:dijital_dolap/providers/clothing_provider.dart';
 import 'package:dijital_dolap/theme/app_theme.dart';
 
@@ -27,6 +28,8 @@ class _AddClothingScreenState extends State<AddClothingScreen> {
 
   String _category = 'tshirt';
   String _season = 'tum';
+  String? _pattern;
+  String? _patternScale;
   bool _isDirty = false;
   bool _needsIroning = false;
   bool _isIroned = false;
@@ -79,6 +82,8 @@ class _AddClothingScreenState extends State<AddClothingScreen> {
             : 'tshirt';
         _season = kSeasonLabels.containsKey(result.season) ? result.season : 'tum';
         _colorNameCtrl.text = result.colorName ?? '';
+        _pattern = result.pattern;
+        _patternScale = result.patternScale;
       }
     });
 
@@ -93,6 +98,8 @@ class _AddClothingScreenState extends State<AddClothingScreen> {
       _previewBytes = null;
       _analysis = null;
       _colorNameCtrl.clear();
+      _pattern = null;
+      _patternScale = null;
       _isDirty = false;
       _needsIroning = false;
       _isIroned = false;
@@ -113,6 +120,8 @@ class _AddClothingScreenState extends State<AddClothingScreen> {
       colorName: _colorNameCtrl.text.trim().isEmpty
           ? null
           : _colorNameCtrl.text.trim(),
+      pattern: _pattern,
+      patternScale: _patternScale,
       isDirty: _isDirty,
       needsIroning: _needsIroning,
       isIroned: _isIroned,
@@ -238,6 +247,54 @@ class _AddClothingScreenState extends State<AddClothingScreen> {
         ],
       ),
       const SizedBox(height: 12),
+      if (analysis.palette.isNotEmpty) ...[
+        Text('Renk paleti', style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final p in analysis.palette)
+              _PaletteChip(entry: p, dominant: p == analysis.palette.first),
+          ],
+        ),
+        const SizedBox(height: 20),
+      ],
+      DropdownButtonFormField<String>(
+        key: ValueKey('pattern-$_pattern'),
+        initialValue: _pattern,
+        decoration: InputDecoration(
+          labelText: 'Desen',
+          border: const OutlineInputBorder(),
+          prefixIcon: const Icon(Icons.texture_outlined),
+          helperText: analysis.patternConfidence == null
+              ? null
+              : 'CLIP güveni: %${(analysis.patternConfidence! * 100).round()}',
+        ),
+        items: [
+          for (final e in kPatternLabels.entries)
+            DropdownMenuItem(value: e.key, child: Text(e.value)),
+        ],
+        onChanged: (v) => setState(() => _pattern = v),
+      ),
+      if (const {'cizgili', 'ekose', 'puantiyeli'}.contains(_pattern)) ...[
+        const SizedBox(height: 16),
+        DropdownButtonFormField<String>(
+          key: ValueKey('scale-$_patternScale'),
+          initialValue: _patternScale ?? 'bilinmiyor',
+          decoration: const InputDecoration(
+            labelText: 'Desen ölçeği',
+            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.straighten),
+          ),
+          items: [
+            for (final e in kPatternScaleLabels.entries)
+              DropdownMenuItem(value: e.key, child: Text(e.value)),
+          ],
+          onChanged: (v) => setState(() => _patternScale = v),
+        ),
+      ],
+      const SizedBox(height: 12),
       SwitchListTile(
         value: _isDirty,
         onChanged: (v) => setState(() => _isDirty = v),
@@ -283,6 +340,47 @@ class _AddClothingScreenState extends State<AddClothingScreen> {
         child: const Text('Vazgeç'),
       ),
     ];
+  }
+}
+
+class _PaletteChip extends StatelessWidget {
+  const _PaletteChip({required this.entry, this.dominant = false});
+
+  final PaletteEntry entry;
+  final bool dominant;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: dominant ? AppColors.ink : AppColors.line,
+          width: dominant ? 1.5 : 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 16,
+            height: 16,
+            decoration: BoxDecoration(
+              color: entry.color,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.line),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '${entry.name ?? ''} %${entry.percent}',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
   }
 }
 

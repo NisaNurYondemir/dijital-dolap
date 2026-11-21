@@ -84,6 +84,8 @@ class ClothingProvider extends ChangeNotifier {
     required String category,
     required String season,
     String? colorName,
+    String? pattern,
+    String? patternScale,
     bool isDirty = false,
     bool needsIroning = false,
     bool isIroned = false,
@@ -91,6 +93,10 @@ class ClothingProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
+      final effectivePattern = pattern ?? analysis.pattern;
+      final effectiveScale = patternScale ?? analysis.patternScale;
+      final manual = (pattern != null && pattern != analysis.pattern) ||
+          (patternScale != null && patternScale != analysis.patternScale);
       final item = await _repo.create({
         'category': category,
         'season': season,
@@ -98,6 +104,20 @@ class ClothingProvider extends ChangeNotifier {
         'hue': analysis.hue,
         'saturation': analysis.saturation,
         'lightness': analysis.lightness,
+        'palette': [
+          for (final p in analysis.palette)
+            {
+              'name': p.name,
+              'hue': p.hue,
+              'saturation': p.saturation,
+              'lightness': p.lightness,
+              'ratio': p.ratio,
+            },
+        ],
+        'pattern': effectivePattern,
+        'pattern_scale': effectiveScale,
+        'pattern_source': manual ? 'manual' : analysis.patternSource,
+        'pattern_confidence': analysis.patternConfidence,
         'is_dirty': isDirty,
         'needs_ironing': needsIroning,
         'is_ironed': isIroned,

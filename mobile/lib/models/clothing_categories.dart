@@ -45,3 +45,29 @@ const Map<String, String> kSeasonLabels = {
   'ilkbahar': 'İlkbahar',
   'sonbahar': 'Sonbahar',
 };
+
+/// Backend desen anahtarı -> Türkçe etiket (pattern_rules.PATTERN_TYPES).
+const Map<String, String> kPatternLabels = {
+  'duz': 'Düz',
+  'cizgili': 'Çizgili',
+  'ekose': 'Ekose',
+  'puantiyeli': 'Puantiyeli',
+  'cicekli': 'Çiçekli',
+  'geometrik': 'Geometrik',
+  'hayvan': 'Hayvan desenli',
+  'baskili': 'Baskılı',
+  'diger': 'Dokulu/desenli',
+  'bilinmiyor': 'Bilinmiyor',
+};
+
+String patternLabel(String? pattern) {
+  if (pattern == null || pattern.isEmpty) return 'Bilinmiyor';
+  return kPatternLabels[pattern] ?? pattern;
+}
+
+const Map<String, String> kPatternScaleLabels = {
+  'ince': 'İnce',
+  'orta': 'Orta',
+  'iri': 'İri',
+  'bilinmiyor': 'Bilinmiyor',
+};
