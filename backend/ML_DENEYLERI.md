@@ -214,3 +214,79 @@ CitySearchDialog geocoding ile Türkiye şehirlerini listeler, seçim sonrası
 öneriler havayla yenilenir (`WeatherProvider`). Testler:
 `backend/tests/test_weather.py` + `test_suggestion_history.py`'ye hava testi.
 
+
+## 11. Renk paleti ve desen farkındalığı (Faz 1)
+
+Amaç: kıyafeti tek bir renge indirgemeden "baskın renk + 2 yan renk" ve
+desen bilgisiyle temsil etmek; kombin motorunda desen çakışmasını ve çok
+renkli parçaların uyumunu hesaba katmak.
+
+### 11.1 Palet çıkarımı (`image_processing.py`)
+
+`process_clothing_image` artık `palette` da döner:
+
+```
+rembg (arka plan) -> k-means (RGB, k=8) -> CIEDE2000 ile birleştirme (dE<18)
+-> en yakın merkeze göre alan oranı -> oranı %8 altındakiler atılır
+-> en fazla 3 renk (baskın + 2 yan) -> HSL + Türkçe renk adı
+```
+
+- `clothes.palette` JSON: `[{name, hue, saturation, lightness, ratio}, ...]`
+- İlk eleman baskın renktir; `hue/saturation/lightness/color_name` alanları
+  da bu renkle eşitlenir (tek renk davranışıyla tutarlı).
+- Aynı adlı tonlar ayrıştırılır: `gri` -> `açık gri` / `koyu gri`.
+- Palet yoksa eski davranış korunur (tek renk).
+
+### 11.2 Desen sınıflandırıcı (`pattern.py`)
+
+- CLIP ViT-B/32 zero-shot; 9 desen sınıfı: `duz, cizgili, ekose, puantiyeli,
+  cicekli, geometrik, hayvan, baskili, diger`.
+- Ölçek (`ince/orta/iri`) yalnızca periyodik desenlerde sorulur.
+- Görsel gömme vektörü kategori ile paylaşılır (tek `encode_image`).
+- Güven < 0,30 ise desen `bilinmiyor` olur (yanlış ceza yazmamak için).
+- `train_pattern_probe.py` ile 150-300 etiketli görselden lineer probe
+  eğitilebilir; `weights/pattern_probe.pt` varsa zero-shot yerine kullanılır.
+- `pattern_rules.loudness()` desen türü + ölçek + renk sayısından 0-1
+  görsel ağırlık üretir.
+
+### 11.3 Karar motoru (`color_engine.py`)
+
+`ItemProfile` = renk paleti + desen + loudness + rol (body/accessory).
+
+- **Ortak renk birincil**: iki parçada hue farkı <= 20° olan bir çift varsa
+  skor en az 0,92 (`ortak_renk`).
+- **Triad destekçi**: palet üçlüsü hue çemberinde 120°±20° oturuyorsa
+  (`palette_harmony == "triad"`) ortak renkli çiftlere +0,03 bonus.
+  Triad zorunlu değildir; tek başına 3 renk uyumu aranmaz.
+- **Çok renkli çakışma**: iki parça da >=2 kromatik renk taşıyor ve ortak
+  renk yoksa skor x0,70 (`cok_renkli`).
+- **Nötr çapa**: bir parça tamamen nötrse (siyah/beyaz/gri) 1,0.
+- **Desen kuralı**: gövde parçalarında (üst/alt/elbise/dış) en fazla 1
+  desenli parça. İki desenli gövde parçası -> 0,35; farklı tür + farklı
+  ölçek + ortak renk varsa "bilinçli karışım" -> 0,60.
+- **Aksesuar muaf**: şapka/atkı/çanta/ayakkabı deseni gövde sınırına sayılmaz;
+  loudness toplamına 0,3 ağırlıkla girer.
+- Toplam skor: `renk * (0,75 + 0,25 * desen)`. Desen bilgisi yoksa toplam
+  skor renk skoruna eşittir (eski davranış birebir korunur).
+
+### 11.4 API ve veritabanı
+
+- `clothes` yeni alanlar: `palette (JSON), pattern, pattern_scale,
+  pattern_source, pattern_confidence` (migration `b3c4d5e6f7a8`).
+- `POST /clothes/analyze` yanıtı: `palette`, `pattern`, `pattern_scale`,
+  `pattern_confidence`, `pattern_source`, `pattern_candidates`.
+- Analiz sonucu geçici görselin yanına `.json` olarak yazılır; eski Flutter
+  sürümü palet/desen göndermese bile kayıt sırasında tamamlanır.
+- `GET /outfits/suggest` yanıtına `pattern_score` eklendi; nedenler desen
+  açıklamalarını içerir.
+- `GET /outfits/{id}/score` artık `score`, `color_score`, `pattern_score`
+  döner.
+
+### 11.5 Testler
+
+- `tests/test_palette.py`: sentetik şeritler, şeffaf arka plan, beyaz kıyafet,
+  eşik altı vurgu rengi.
+- `tests/test_pattern_rules.py`: palet harmonisi, ortak renk, çok renkli
+  ceza, nötr çapa, tek/çift desenli gövde, güç çakışması, aksesuar muafiyeti.
+- `tests/test_suggestion_pattern.py`: desenli etek cezası, açıklama metni,
+  baskılı ayakkabının sınırı tetiklememesi, desen verisi yokken eski skor.

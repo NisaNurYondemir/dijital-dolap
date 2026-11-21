@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, selectinload
 
 from auth import get_db, get_current_user
-from color_engine import Color, score_outfit
+from color_engine import ItemProfile, evaluate_outfit
 from models.clothing import Clothing
 from models.occasion import OccasionGroup
 from models.outfit import Outfit, WearHistory
@@ -13,7 +13,9 @@ from models.user import User
 from schemas.clothing import ClothingOut, Season
 from schemas.outfit import OutfitCreate, OutfitOut, OutfitSuggestion, OutfitUpdate
 from schemas.wear import WearOut
-from suggestion import ItemHistory, PairHistory, WeatherContext, group_of, suggest_outfits
+from suggestion import (
+    ItemHistory, PairHistory, WeatherContext, group_of, scope_of, suggest_outfits,
+)
 from style_profile import (
     StyleItem,
     StyleOutfit,
@@ -360,6 +362,7 @@ def suggest(
         OutfitSuggestion(
             score=round(r.score, 3),
             color_score=round(r.color_score, 3),
+            pattern_score=round(r.pattern_score, 3),
             reasons=r.reasons,
             clothes=[ClothingOut.model_validate(i) for i in r.items],
         )
@@ -444,8 +447,16 @@ def get_outfit_score(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Kombinin renk uyum skorunu döner (0-1)."""
+    """Kombinin renk ve desen uyum skorlarını döner (0-1)."""
     outfit = get_owned_outfit(outfit_id, db, current_user)
-    colors = [Color.from_item(c) for c in outfit.clothes]
-    score = score_outfit(colors)
-    return {"outfit_id": outfit_id, "score": round(score, 3)}
+    profiles = [
+        ItemProfile.from_item(c, scope=scope_of(c))
+        for c in outfit.clothes
+    ]
+    total, color, pattern, _ = evaluate_outfit(profiles)
+    return {
+        "outfit_id": outfit_id,
+        "score": round(total, 3),
+        "color_score": round(color, 3),
+        "pattern_score": round(pattern, 3),
+    }

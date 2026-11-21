@@ -12,10 +12,18 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
 
-from color_engine import Color, score_outfit
+from color_engine import ItemProfile, evaluate_outfit
 from style_profile import StyleWeights, hue_bucket, style_affinity
 
 MAX_PER_GROUP = 40   # her gruptan en fazla bu kadar parça değerlendirilir
+
+# Aksesuar kategorileri: desen kuralında ana parçalarla aynı sertliğe tabi
+# değildir (şapka/atkı/çanta deseni çizgili tişörtle giyilebilir).
+# Not: bunlar CATEGORY_GROUPS'a eklenmez; kombin üretiminde ana parça olmazlar.
+ACCESSORY_CATEGORIES = {
+    "sapka", "sal", "atki", "bere", "kemer", "canta", "taki", "gozluk",
+    "ayakkabi", "sneaker", "bot", "cizme", "sandalet", "terlik", "topuklu",
+}
 
 # Kategori adı -> grup eşlemesi (normalize edilmiş adlar: küçük harf, Türkçe
 # karakter ve - _ boşluk yok). Kendi kategorilerini buraya ekleyebilirsin.
@@ -110,11 +118,18 @@ class Suggestion:
     items: list
     score: float
     color_score: float = 0.0
+    pattern_score: float = 1.0
     reasons: list[str] = field(default_factory=list)
 
 
-def _colors(items) -> list[Color]:
-    return [Color.from_item(i) for i in items]
+def scope_of(item) -> str:
+    """Parçanın desen kuralındaki rolü: gövde mi aksesuar mı?"""
+    name = normalize(item.category)
+    return "accessory" if name in ACCESSORY_CATEGORIES else "body"
+
+
+def _profiles(items) -> list[ItemProfile]:
+    return [ItemProfile.from_item(i, scope=scope_of(i)) for i in items]
 
 
 def _is_candidate(item, season: Optional[str]) -> bool:
@@ -125,7 +140,7 @@ def _is_candidate(item, season: Optional[str]) -> bool:
 
 def _best_addition(base: list, candidates: list):
     """Kombine eklenince toplam uyum skorunu en yüksek yapan parçayı seçer."""
-    return max(candidates, key=lambda c: score_outfit(_colors(base + [c])))
+    return max(candidates, key=lambda c: evaluate_outfit(_profiles(base + [c]))[0])
 
 
 def _rating_pref(avg: float) -> float:
@@ -230,6 +245,7 @@ def _reasons(
     now: datetime,
     weather: Optional[WeatherContext] = None,
     style_aff: Optional[float] = None,
+    pattern_reasons: Optional[list[str]] = None,
 ) -> list[str]:
     reasons: list[str] = []
     if weather is not None:
@@ -242,6 +258,9 @@ def _reasons(
         reasons.append("Renkler birbiriyle çok uyumlu")
     elif color_score >= 0.7:
         reasons.append("Renk uyumu iyi")
+
+    if pattern_reasons:
+        reasons.extend(pattern_reasons)
 
     if style_aff is not None and style_aff >= 0.7:
         reasons.append("Tarzına uygun parçalar")
@@ -346,7 +365,9 @@ def suggest_outfits(
         if include_shoes and groups["ayakkabi"]:
             outfit.append(_best_addition(outfit, groups["ayakkabi"]))
 
-        color = score_outfit(_colors(outfit))
+        compat, color, pattern_score, pattern_reasons = evaluate_outfit(
+            _profiles(outfit)
+        )
         item_histories = [
             history.get(item.id) if history else None for item in outfit
         ]
@@ -375,10 +396,10 @@ def suggest_outfits(
         if not history and not pair_history and not use_occasion:
             if style is not None:
                 # Gecmis sinyali yoksa tarz tek etken olarak kullanilir.
-                score = color * (0.85 + 0.15 * style_aff)
+                score = compat * (0.85 + 0.15 * style_aff)
             else:
-                # Geçmiş yokken eski davranış korunur: yalnızca renk uyumu.
-                score = color
+                # Geçmiş yokken eski davranış korunur: renk + desen uyumu.
+                score = compat
         else:
             rotation = (
                 sum(_rotation_score(h, now) for h in item_histories)
@@ -401,7 +422,7 @@ def suggest_outfits(
                     + 0.15 * rotation
                     + 0.15 * affinity
                 )
-            score = color * (0.80 + 0.20 * preference)
+            score = compat * (0.80 + 0.20 * preference)
         score = min(score, 1.0)
 
         suggestions.append(
@@ -409,6 +430,7 @@ def suggest_outfits(
                 items=outfit,
                 score=score,
                 color_score=color,
+                pattern_score=pattern_score,
                 reasons=_reasons(
                     outfit,
                     color,
@@ -418,6 +440,7 @@ def suggest_outfits(
                     now,
                     weather=weather,
                     style_aff=style_aff,
+                    pattern_reasons=pattern_reasons,
                 ),
             )
         )

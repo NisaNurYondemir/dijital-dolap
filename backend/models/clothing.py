@@ -1,4 +1,6 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, DateTime, func, false
+from sqlalchemy import (
+    JSON, Boolean, Column, DateTime, Float, ForeignKey, Integer, String, false, func,
+)
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -12,11 +14,21 @@ class Clothing(Base):
     category    = Column(String, nullable=False)   # "tshirt", "pantolon", "elbise" vb.
     season      = Column(String, nullable=False)   # "yaz", "kis", "ilkbahar", "sonbahar", "tum"
 
-    # Renk (HSL)
+    # Renk (HSL) - baskın renk
     hue         = Column(Float, nullable=True)     # 0-360
     saturation  = Column(Float, nullable=True)     # 0-100
     lightness   = Column(Float, nullable=True)     # 0-100
     color_name  = Column(String, nullable=True)    # "lacivert", "kırmızı" vb.
+
+    # Renk paleti: [{name, hue, saturation, lightness, ratio}, ...]
+    # İlk eleman baskın renktir; çok renkli kıyafetlerde yan renkler de tutulur.
+    palette     = Column(JSON, nullable=True)
+
+    # Desen
+    pattern            = Column(String, nullable=True)   # duz/cizgili/ekose/...
+    pattern_scale      = Column(String, nullable=True)   # ince/orta/iri/bilinmiyor
+    pattern_source     = Column(String, nullable=True)   # zero_shot/probe/manual
+    pattern_confidence = Column(Float, nullable=True)    # 0-1
 
     # Durum
     is_dirty    = Column(Boolean, default=False)

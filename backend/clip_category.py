@@ -103,24 +103,41 @@ def _get_text_features() -> torch.Tensor:
     return _text_features
 
 
-def probabilities(image_bytes: bytes):
-    """Görsel için 20 kategoriye ait olasılık vektörü döner (numpy array)."""
+def image_features(image_bytes: bytes) -> torch.Tensor:
+    """Görselin normalize edilmiş CLIP gömme vektörünü döner (1 x D).
+
+    Kategori ve desen sınıflandırıcıları aynı vektörü paylaşabilsin diye
+    dışa açıldı; böylece görsel her istekte iki kez kodlanmaz.
+    """
     image = preprocess(
         Image.open(io.BytesIO(image_bytes)).convert("RGB")
     ).unsqueeze(0).to(device)
     with torch.no_grad():
         feat = model.encode_image(image)
-        feat = feat / feat.norm(dim=-1, keepdim=True)
+    return feat / feat.norm(dim=-1, keepdim=True)
+
+
+def probabilities(image_bytes: bytes):
+    """Görsel için 20 kategoriye ait olasılık vektörü döner (numpy array)."""
+    feat = image_features(image_bytes)
+    with torch.no_grad():
         logits = CLIP_LOGIT_SCALE * feat @ _get_text_features().T
         probs = logits.softmax(dim=-1)
     return probs.cpu().numpy()[0]
 
 
+def top_categories_from_features(feat: torch.Tensor, k: int = 3) -> list[tuple[str, float]]:
+    """Önceden çıkarılmış görsel özelliğinden en olası k kategori."""
+    with torch.no_grad():
+        logits = CLIP_LOGIT_SCALE * feat @ _get_text_features().T
+        probs = logits.softmax(dim=-1)[0]
+    top = probs.argsort(descending=True)[:k]
+    return [(CATEGORIES[int(i)], float(probs[int(i)])) for i in top]
+
+
 def predict_top_categories(image_bytes: bytes, k: int = 3) -> list[tuple[str, float]]:
     """En olası k kategoriyi (ad, olasılık) olarak, en olasıdan başlayarak döner."""
-    probs = probabilities(image_bytes)
-    top = probs.argsort()[::-1][:k]
-    return [(CATEGORIES[i], float(probs[i])) for i in top]
+    return top_categories_from_features(image_features(image_bytes), k=k)
 
 
 def predict_category(image_bytes: bytes) -> str:

@@ -54,5 +54,6 @@ class OutfitOut(BaseModel):
 class OutfitSuggestion(BaseModel):
     score: float
     color_score: float = 0.0
+    pattern_score: float = 1.0
     reasons: list[str] = []
     clothes: list[ClothingOut]

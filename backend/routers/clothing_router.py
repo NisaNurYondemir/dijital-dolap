@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 import shutil
@@ -13,10 +14,13 @@ from sqlalchemy.orm import Session
 
 from analysis import color_name, suggest_season
 from auth import get_current_user, get_db
-from clip_category import predict_category, predict_top_categories
+from clip_category import (
+    image_features, predict_category, top_categories_from_features,
+)
 from image_processing import process_clothing_image
 from models.clothing import Clothing
 from models.user import User
+from pattern import predict_pattern_from_features
 from schemas.clothing import ClothingCreate, ClothingOut, ClothingUpdate, WashRequest
 logger = logging.getLogger(__name__)
 
@@ -49,14 +53,30 @@ def _flatten_on_white(png_bytes: bytes) -> bytes:
 
 
 def _cleanup_tmp() -> None:
-    """Bir saatten eski geçici görselleri siler."""
+    """Bir saatten eski geçici görselleri (ve analiz notlarını) siler."""
     limit = time.time() - TMP_MAX_AGE_SECONDS
-    for f in TMP_DIR.glob("*.png"):
-        try:
-            if f.stat().st_mtime < limit:
-                f.unlink(missing_ok=True)
-        except OSError:
-            pass
+    for pattern in ("*.png", "*.json"):
+        for f in TMP_DIR.glob(pattern):
+            try:
+                if f.stat().st_mtime < limit:
+                    f.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+
+def _sidecar_path(filename: str) -> Path:
+    return TMP_DIR / f"{filename}.json"
+
+
+def _read_sidecar(filename: str) -> Optional[dict]:
+    """Analiz sırasında yazılan palet/desen notlarını okur."""
+    path = _sidecar_path(filename)
+    if not path.is_file():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
 
 
 def _claim_tmp_image(temp_image: str, user: User) -> str:
@@ -69,6 +89,7 @@ def _claim_tmp_image(temp_image: str, user: User) -> str:
         raise HTTPException(410, "Geçici görselin süresi dolmuş, fotoğrafı yeniden yükleyin")
     filename = f"{user.id}_{uuid.uuid4().hex}.png"
     shutil.move(str(src), str(UPLOAD_DIR / filename))
+    _sidecar_path(temp_image).unlink(missing_ok=True)
     return f"uploads/{filename}"
 
 router = APIRouter(prefix="/clothes", tags=["clothes"])
@@ -104,7 +125,11 @@ def analyze_clothing_image(
 
     try:
         result = process_clothing_image(image_bytes)
-        top = predict_top_categories(_flatten_on_white(result.image_bytes), k=3)
+        flat = _flatten_on_white(result.image_bytes)
+        # Görsel yalnızca bir kez kodlanır; kategori ve desen aynı vektörü kullanır.
+        features = image_features(flat)
+        top = top_categories_from_features(features, k=3)
+        pattern = predict_pattern_from_features(features)
     except Exception:
         logger.exception("Analiz hatası")
         raise HTTPException(422, "Görsel işlenemedi, geçerli bir görsel gönderin")
@@ -117,8 +142,9 @@ def analyze_clothing_image(
     saturation = color.saturation if color else None
     lightness = color.lightness if color else None
     category = top[0][0]
+    palette = [p.as_dict() for p in result.palette]
 
-    return {
+    response = {
         "temp_image": filename,
         "preview_path": f"uploads/tmp/{filename}",
         "category": category,
@@ -130,7 +156,21 @@ def analyze_clothing_image(
         "saturation": saturation,
         "lightness": lightness,
         "color_name": color_name(hue, saturation, lightness),
+        "palette": palette,
+        "pattern": pattern.pattern,
+        "pattern_scale": pattern.scale,
+        "pattern_confidence": pattern.confidence,
+        "pattern_source": pattern.source,
+        "pattern_candidates": [
+            {"pattern": p, "probability": round(prob, 3)}
+            for p, prob in pattern.candidates
+        ],
     }
+    # Kullanıcı onayladığında palet/desen bilgisi kaybolmasın diye yanına not düşülür.
+    _sidecar_path(filename).write_text(
+        json.dumps(response, ensure_ascii=False), encoding="utf-8"
+    )
+    return response
 
 
 @router.post("/", response_model=ClothingOut, status_code=201)
@@ -140,6 +180,13 @@ def create_clothing(
     current_user: User = Depends(get_current_user),
 ):
     data = req.model_dump(exclude={"temp_image"})
+    if req.temp_image:
+        # Flutter eski sürümü palet/desen göndermezse analiz notundan tamamla.
+        side = _read_sidecar(req.temp_image) or {}
+        for key in ("palette", "pattern", "pattern_scale",
+                    "pattern_source", "pattern_confidence"):
+            if data.get(key) is None and side.get(key) is not None:
+                data[key] = side[key]
     image_path = _claim_tmp_image(req.temp_image, current_user) if req.temp_image else None
 
     item = Clothing(user_id=current_user.id, image_path=image_path, **data)
@@ -309,6 +356,9 @@ def upload_clothing_image(
 
     try:
         result = process_clothing_image(image_bytes)
+        flat = _flatten_on_white(result.image_bytes)
+        features = image_features(flat)
+        pattern = predict_pattern_from_features(features)
     except Exception:
         logger.exception("Görüntü işleme hatası")
         raise HTTPException(422, "Görsel işlenemedi, geçerli bir görsel gönderin")
@@ -323,6 +373,14 @@ def upload_clothing_image(
         item.hue = result.color.hue
         item.saturation = result.color.saturation
         item.lightness = result.color.lightness
+        item.color_name = color_name(
+            result.color.hue, result.color.saturation, result.color.lightness
+        )
+    item.palette = [p.as_dict() for p in result.palette] or None
+    item.pattern = pattern.pattern
+    item.pattern_scale = pattern.scale
+    item.pattern_source = pattern.source
+    item.pattern_confidence = pattern.confidence
 
     db.commit()
     db.refresh(item)
