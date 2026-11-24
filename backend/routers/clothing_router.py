@@ -129,7 +129,7 @@ def analyze_clothing_image(
         # Görsel yalnızca bir kez kodlanır; kategori ve desen aynı vektörü kullanır.
         features = image_features(flat)
         top = top_categories_from_features(features, k=3)
-        pattern = predict_pattern_from_features(features)
+        pattern = predict_pattern_from_features(features, flat)
     except Exception:
         logger.exception("Analiz hatası")
         raise HTTPException(422, "Görsel işlenemedi, geçerli bir görsel gönderin")
@@ -358,7 +358,7 @@ def upload_clothing_image(
         result = process_clothing_image(image_bytes)
         flat = _flatten_on_white(result.image_bytes)
         features = image_features(flat)
-        pattern = predict_pattern_from_features(features)
+        pattern = predict_pattern_from_features(features, flat)
     except Exception:
         logger.exception("Görüntü işleme hatası")
         raise HTTPException(422, "Görsel işlenemedi, geçerli bir görsel gönderin")

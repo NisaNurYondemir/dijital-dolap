@@ -290,3 +290,66 @@ rembg (arka plan) -> k-means (RGB, k=8) -> CIEDE2000 ile birleştirme (dE<18)
   ceza, nötr çapa, tek/çift desenli gövde, güç çakışması, aksesuar muafiyeti.
 - `tests/test_suggestion_pattern.py`: desenli etek cezası, açıklama metni,
   baskılı ayakkabının sınırı tetiklememesi, desen verisi yokken eski skor.
+
+## 12. Desen sınıflandırıcı doğruluk ölçümü ve iyileştirme
+
+### 12.1 Ölçüm düzeneği
+
+- 50 gerçek fotoğraf (10 kategori x 5, `clothing-dataset-small`).
+- Her görsel tek tek görsel olarak incelenip desen türü etiketlendi
+  (tek etiketleyici, 9 sınıf: düz, çizgili, ekose, puantiyeli, çiçekli,
+  geometrik, hayvan, baskılı, dokulu).
+- Etiketler `D:\tmp\pattern_eval\labels.json` altında; ölçüm betiği aynı
+  ön işlemeyi (rembg + beyaz zemin) uygular, yani üretim yolu ölçülür.
+- Ölçüm bir geliştirme kümesidir: prompt ve karar ayarları bu 50 görsel
+  üzerinde yapıldı. Bağımsız başarım için ayrı etiketli küme gerekir.
+
+### 12.2 Başlangıç durumu (v1)
+
+| Metrik | Sonuç |
+|---|---|
+| Tür bazında birebir doğruluk | 34/50 = %68,0 |
+| Düz/desenli ikili doğruluk | 39/50 = %78,0 |
+| İkili kesinlik / duyarlılık | %67,7 / %95,5 |
+| Gövde parçalarında birebir | 30/40 = %75,0 |
+
+Hata dağılımı: gerçek düz kumaşların çoğu `dokulu/desenli` sınıfına kaçıyor
+(kapitone mont, dantel, triko); ayrıca bazı düz parçalar `çiçekli` veya `ekose`
+okunuyor. Sınıflandırıcı desenli parçayı neredeyse hiç kaçırmıyor, ancak düz
+parçayı fazla desenli sayıyor.
+
+### 12.3 Yapılan iyileştirmeler
+
+1. **Prompt genişletme ve netleştirme**: düz sınıfı için "baskısız, tek renk,
+   üniform kumaş" vurgulandı; her desen sınıfına ayırt edici örnekler
+   (breton çizgi, flanel ekose, liberty çiçek, aztek geometrik vb.) eklendi.
+2. **`diger` sınıfı zero-shot'tan çıkarıldı**: "dokulu/desenli" tanımı çok
+   geniş olduğu için düz kumaşları yutuyordu. Anahtar veritabanında ve manuel
+   seçimde kalır; otomatik tahminde kullanılmaz.
+3. **Çoklu görünüm**: tam görünüm ve merkezden %35 kırpılmış yakın plan ayrı
+   ayrı CLIP ile kodlanıp vektörlerin ortalaması alınır. Yakın plan küçük
+   desenleri (çiçek, puantiye, ince çizgi) daha iyi ayırır. Kategori
+   sınıflandırıcısı tam görünüm vektörünü paylaşmaya devam eder; ek maliyet
+   görsel başına bir CLIP kodlamasıdır.
+
+### 12.4 Sonuç (v2)
+
+| Metrik | v1 | v2 |
+|---|---|---|
+| Tür bazında birebir doğruluk | %68,0 | **%84,0** (42/50) |
+| Düz/desenli ikili doğruluk | %78,0 | **%90,0** (45/50) |
+| İkili kesinlik / duyarlılık | %67,7 / %95,5 | %81,5 / %100 |
+| Gövde parçalarında birebir | %75,0 | **%90,0** (36/40) |
+
+Kalan hatalar: dantel elbisenin çiçekli okunması, küçük çiçekli kumaşın
+hayvan desenine benzemesi, grafik baskılı şapkanın puantiyeli sanılması.
+Bunların bir kısmı etiket sınırı da olabilir (dantel/çiçek, küçük çiçek/
+leopar). Ayakkabı hataları aksesuar muafiyeti nedeniyle skoru doğrudan
+etkilemez.
+
+### 12.5 Geriye dönük uyumluluk
+
+- `predict_pattern_from_features(features)` eski imzayla çalışmaya devam eder;
+  `image_bytes` verilmezse yalnızca tam görünüm kullanılır.
+- Mevcut kayıtlardaki `diger` etiketi geçerlidir; manuel düzenlemede seçilebilir.
+- Kategori (CLIP) yolu değişmedi; 134 test geçer.
