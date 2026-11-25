@@ -31,7 +31,7 @@ class CalendarEvent {
       'title': title,
       'kind': kind,
       'event_date': eventDate.toUtc().toIso8601String(),
-      if (occasionGroupId != null) 'occasion_group_id': occasionGroupId,
+      'occasion_group_id': occasionGroupId,
       if (note != null) 'note': note,
     };
   }

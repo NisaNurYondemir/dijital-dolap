@@ -101,7 +101,9 @@ def update_event(
         event.event_date = req.event_date
     if req.note is not None:
         event.note = req.note
-    if req.occasion_group_id is not None:
+    # Alan açıkça gönderildiyse (null olsa bile) güncelle: kullanıcı
+    # etkinlikten kategori seçimini kaldırabilsin.
+    if "occasion_group_id" in req.model_fields_set:
         event.occasion_group_id = _resolve_occasion(
             req.occasion_group_id, db, current_user
         )

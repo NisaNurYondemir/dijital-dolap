@@ -2,14 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:dijital_dolap/data/api_client.dart';
 import 'package:dijital_dolap/models/calendar.dart';
+import 'package:dijital_dolap/models/occasion_group.dart';
 import 'package:dijital_dolap/models/week_plan.dart';
 import 'package:dijital_dolap/providers/calendar_provider.dart';
+import 'package:dijital_dolap/providers/occasion_provider.dart';
 import 'package:dijital_dolap/providers/weather_provider.dart';
 import 'package:dijital_dolap/providers/week_plan_provider.dart';
 import 'package:dijital_dolap/theme/app_theme.dart';
 import 'package:dijital_dolap/utils/error_text.dart';
 import 'package:dijital_dolap/widgets/event_outfits_sheet.dart';
 import 'package:dijital_dolap/widgets/mini_calendar.dart';
+import 'package:dijital_dolap/widgets/occasion_group_dialog.dart';
 
 /// Takvim sekmesi: yaklaşan kıyafet gerektiren olaylar + hazırlık uyarıları.
 class CalendarScreen extends StatefulWidget {
@@ -157,6 +160,22 @@ const _kinds = <String, String>{
   'dogum_gunu': 'Doğum günü',
   'genel': 'Genel',
 };
+
+/// Kullanıcının kategori adını, hazırlık uyarılarının anladığı olay
+/// türüne eşler. Eşleşme yoksa genel bir olay kabul edilir.
+String _kindForOccasion(OccasionGroup? group) {
+  final name = group?.name.trim().toLowerCase() ?? '';
+  if (name.isEmpty) return 'genel';
+  if (name.contains('düğün') || name.contains('dugun')) return 'dugun';
+  if (name.contains('nişan') || name.contains('nisan')) return 'nisan';
+  if (name.contains('kına') || name.contains('kina')) return 'kina';
+  if (name.contains('nikah')) return 'nikah';
+  if (name.contains('mezuniyet')) return 'mezuniyet';
+  if (name.contains('özel gün') || name.contains('ozel gun')) {
+    return 'ozel_gun';
+  }
+  return 'genel';
+}
 
 /// Hafta planı: yaklaşan olaylar için hava + hazır set kartı.
 class _WeekPlanSection extends StatelessWidget {
@@ -308,6 +327,10 @@ class _EventTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.watch<CalendarProvider>();
+    final occasion = context.watch<OccasionProvider>().byId(
+          event.occasionGroupId,
+        );
+    final typeLabel = occasion?.label ?? (_kinds[event.kind] ?? event.kind);
     final insights = p.insights
         .where((i) => i.eventId == event.id)
         .toList();
@@ -364,7 +387,7 @@ class _EventTile extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 2),
                 Text(
-                  '$_daysText · ${_kinds[event.kind] ?? event.kind}',
+                  '$_daysText · $typeLabel',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 if (insight != null) ...[
@@ -430,17 +453,23 @@ class _EventDialog extends StatefulWidget {
 
 class _EventDialogState extends State<_EventDialog> {
   late final TextEditingController _controller;
-  late String _kind;
   late DateTime _date;
+  int? _occasionId;
 
   @override
   void initState() {
     super.initState();
     final existing = widget.existing;
     _controller = TextEditingController(text: existing?.title ?? '');
-    // Takvime disiplinli durum oluşturmak için normalize edelim.
-    _kind = _kinds.containsKey(existing?.kind) ? existing!.kind : 'genel';
+    _occasionId = existing?.occasionGroupId;
     _date = existing?.eventDate ?? DateTime.now().add(const Duration(days: 7));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final occasions = context.read<OccasionProvider>();
+      if (occasions.groups.isEmpty && !occasions.loading) {
+        occasions.load();
+      }
+    });
   }
 
   @override
@@ -461,16 +490,29 @@ class _EventDialogState extends State<_EventDialog> {
     }
   }
 
+  Future<void> _createGroup() async {
+    final created = await showOccasionGroupDialog(context);
+    if (created != null && mounted) {
+      setState(() => _occasionId = created.id);
+    }
+  }
+
   Future<void> _save() async {
     final title = _controller.text.trim();
     if (title.length < 2) return;
     final provider = context.read<CalendarProvider>();
+    final group = context.read<OccasionProvider>().byId(_occasionId);
+    final kind = _occasionId == null
+        ? 'genel'
+        : (group != null
+            ? _kindForOccasion(group)
+            : (widget.existing?.kind ?? 'genel'));
     final event = CalendarEvent(
       id: widget.existing?.id,
       title: title,
-      kind: _kind,
+      kind: kind,
       eventDate: _date,
-      occasionGroupId: widget.existing?.occasionGroupId,
+      occasionGroupId: _occasionId,
       note: widget.existing?.note,
     );
     final dynamic result;
@@ -496,37 +538,88 @@ class _EventDialogState extends State<_EventDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final occasions = context.watch<OccasionProvider>();
+    final groups = occasions.groups;
+    final selectedId = groups.any((g) => g.id == _occasionId)
+        ? _occasionId
+        : null;
+
     return AlertDialog(
       title: Text(widget.existing == null ? 'Olay ekle' : 'Olayı düzenle'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _controller,
-            autofocus: true,
-            decoration: const InputDecoration(labelText: 'Olay başlığı'),
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            initialValue: _kind,
-            decoration: const InputDecoration(labelText: 'Tür'),
-            items: _kinds.entries
-                .map((e) => DropdownMenuItem(
-                      value: e.key,
-                      child: Text(e.value),
-                    ))
-                .toList(),
-            onChanged: (v) => setState(() => _kind = v ?? 'genel'),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: _pickDate,
-            icon: const Icon(Icons.calendar_month_outlined),
-            label: Text(
-              '${_date.day}/${_date.month}/${_date.year}',
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _controller,
+              autofocus: true,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(
+                labelText: 'Özel gün adı',
+                hintText: 'Örn. Ayşe’nin düğünü',
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            DropdownButtonFormField<int?>(
+              key: ValueKey('event-occasion-$selectedId-${groups.length}'),
+              initialValue: selectedId,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Özel gün tipi',
+              ),
+              hint: const Text('Kategori seç'),
+              items: [
+                const DropdownMenuItem<int?>(
+                  value: null,
+                  child: Text('Kategori seçilmedi'),
+                ),
+                for (final group in groups)
+                  DropdownMenuItem<int?>(
+                    value: group.id,
+                    child: Text(
+                      group.label,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+              onChanged: (value) => setState(() => _occasionId = value),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: occasions.loading ? null : _createGroup,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Yeni kategori'),
+              ),
+            ),
+            if (occasions.loading && groups.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: LinearProgressIndicator(minHeight: 2),
+              ),
+            if (!occasions.loading && groups.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'Henüz kombin kategorin yok. “Yeni kategori” ile '
+                  'düğün, iş, tatil gibi bir grup oluşturabilirsin.',
+                  style: TextStyle(fontSize: 12, color: AppColors.slate),
+                ),
+              ),
+            const SizedBox(height: 4),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: _pickDate,
+                icon: const Icon(Icons.calendar_month_outlined),
+                label: Text(
+                  '${_date.day}/${_date.month}/${_date.year}',
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(

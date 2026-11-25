@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:dijital_dolap/data/api_client.dart';
 import 'package:dijital_dolap/data/outfit_repository.dart';
 import 'package:dijital_dolap/models/calendar.dart';
+import 'package:dijital_dolap/models/clothing_categories.dart';
+import 'package:dijital_dolap/models/clothing_item.dart';
 import 'package:dijital_dolap/models/outfit.dart';
+import 'package:dijital_dolap/providers/occasion_provider.dart';
 import 'package:dijital_dolap/screens/outfit_detail_screen.dart';
 import 'package:dijital_dolap/utils/error_text.dart';
 import 'package:dijital_dolap/widgets/clothing_thumb.dart';
@@ -73,6 +77,9 @@ class _EventOutfitsSheetState extends State<_EventOutfitsSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final occasion = context.watch<OccasionProvider>().byId(
+          widget.event.occasionGroupId,
+        );
     return DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.8,
@@ -95,6 +102,20 @@ class _EventOutfitsSheetState extends State<_EventOutfitsSheet> {
                       .bodySmall
                       ?.copyWith(color: Colors.grey.shade600),
                 ),
+                if (occasion != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      'Kategori: ${occasion.label}',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -134,10 +155,24 @@ class _EventOutfitsSheetState extends State<_EventOutfitsSheet> {
         ),
       );
     }
+    // Kategori seçiliyse o kategorideki kayıtlı kombinlerin parçalarını
+    // hazır/hazır değil olarak özetle. Kayıtlı kombin yoksa önerilerdeki
+    // parçalar gösterilir.
+    final statusSource = saved.isNotEmpty ? saved : suggestions;
+    final statusItems = _uniqueItems(statusSource);
+    final statusLabel = widget.event.occasionGroupId == null
+        ? 'Kombinlerdeki parçalar'
+        : (saved.isNotEmpty
+            ? 'Bu kategorideki parçalar'
+            : 'Önerilerdeki parçalar');
     return ListView(
       controller: controller,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
+        if (statusItems.isNotEmpty) ...[
+          _ItemStatusSection(label: statusLabel, items: statusItems),
+          const SizedBox(height: 12),
+        ],
         if (saved.isNotEmpty) ...[
           _sectionLabel('Kaydedilmiş kombinler'),
           for (final outfit in saved) ...[
@@ -157,18 +192,169 @@ class _EventOutfitsSheetState extends State<_EventOutfitsSheet> {
     );
   }
 
-  Widget _sectionLabel(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 8, top: 4),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w800,
-          color: Colors.grey.shade600,
-          letterSpacing: 0.4,
-        ),
+  List<ClothingItem> _uniqueItems(List<Outfit> outfits) {
+    final seen = <int>{};
+    final items = <ClothingItem>[];
+    for (final outfit in outfits) {
+      for (final item in outfit.clothes) {
+        if (seen.add(item.id)) items.add(item);
+      }
+    }
+    items.sort((a, b) {
+      final byCategory =
+          categoryLabel(a.category).compareTo(categoryLabel(b.category));
+      return byCategory != 0 ? byCategory : a.id.compareTo(b.id);
+    });
+    return items;
+  }
+}
+
+Widget _sectionLabel(String text) {
+  return Padding(
+    padding: const EdgeInsets.only(left: 4, bottom: 8, top: 4),
+    child: Text(
+      text,
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w800,
+        color: Colors.grey.shade600,
+        letterSpacing: 0.4,
       ),
+    ),
+  );
+}
+
+/// Kategorideki parçaları "müsait" ve "müsait değil" olarak ikiye ayırır.
+class _ItemStatusSection extends StatelessWidget {
+  const _ItemStatusSection({required this.label, required this.items});
+
+  final String label;
+  final List<ClothingItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final ready = items.where((c) => c.isWearable).toList();
+    final waiting = items.where((c) => !c.isWearable).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionLabel(label),
+        _StatusRow(
+          label: 'Müsait parçalar',
+          items: ready,
+          color: Colors.green.shade700,
+          showReason: false,
+        ),
+        if (waiting.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _StatusRow(
+            label: 'Müsait olmayan parçalar',
+            items: waiting,
+            color: Colors.orange.shade900,
+            showReason: true,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _StatusRow extends StatelessWidget {
+  const _StatusRow({
+    required this.label,
+    required this.items,
+    required this.color,
+    required this.showReason,
+  });
+
+  final String label;
+  final List<ClothingItem> items;
+  final Color color;
+  final bool showReason;
+
+  String _reason(ClothingItem item) {
+    final parts = <String>[
+      if (item.isDirty) 'Kirli',
+      if (item.needsIroning && !item.isIroned) 'Ütü bekliyor',
+    ];
+    return parts.join(' · ');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              showReason ? Icons.error_outline : Icons.check_circle_outline,
+              size: 16,
+              color: color,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '$label (${items.length})',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w800,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+        if (items.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(left: 22, top: 4),
+            child: Text(
+              'Bu grupta parça yok',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+          )
+        else
+          SizedBox(
+            height: showReason ? 150 : 126,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.only(top: 8, bottom: 2),
+              itemCount: items.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              itemBuilder: (_, i) {
+                final item = items[i];
+                return SizedBox(
+                  width: 76,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClothingThumb(item: item, width: 64, height: 84),
+                      const SizedBox(height: 4),
+                      Text(
+                        categoryLabel(item.category),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      if (showReason)
+                        Text(
+                          _reason(item),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            height: 1.15,
+                            color: color,
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
     );
   }
 }
