@@ -16,11 +16,13 @@ class OccasionRepository {
     String name, {
     String? emoji,
     String? color,
+    String? occasionType,
   }) async {
     final res = await _api.post('/occasions/', body: {
       'name': name,
       'emoji': ?emoji,
       'color': ?color,
+      'occasion_type': ?occasionType,
     });
     return OccasionGroup.fromJson(res as Map<String, dynamic>);
   }
@@ -30,11 +32,13 @@ class OccasionRepository {
     String? name,
     String? emoji,
     String? color,
+    String? occasionType,
   }) async {
     final res = await _api.patch('/occasions/$id', {
       'name': ?name,
       'emoji': ?emoji,
       'color': ?color,
+      'occasion_type': ?occasionType,
     });
     return OccasionGroup.fromJson(res as Map<String, dynamic>);
   }

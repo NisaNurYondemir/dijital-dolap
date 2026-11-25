@@ -53,6 +53,8 @@ class _OccasionGroupDialogState extends State<_OccasionGroupDialog> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _emojiCtrl;
   late String _selectedColor;
+  late String _occasionType;
+  bool _typeTouched = false;
   bool _saving = false;
   String? _error;
 
@@ -62,6 +64,18 @@ class _OccasionGroupDialogState extends State<_OccasionGroupDialog> {
     _nameCtrl = TextEditingController(text: widget.group?.name ?? '');
     _emojiCtrl = TextEditingController(text: widget.group?.emoji ?? '');
     _selectedColor = widget.group?.colorHex ?? occasionColors.first;
+    _occasionType = widget.group?.occasionType ?? 'casual';
+    // Mevcut grubun tipi korunur; yeni grupta ad yazıldıkça tip tahmin edilir.
+    _typeTouched = widget.group != null;
+    _nameCtrl.addListener(_onNameChanged);
+  }
+
+  void _onNameChanged() {
+    if (_typeTouched) return;
+    final inferred = inferOccasionType(_nameCtrl.text);
+    if (inferred != _occasionType) {
+      setState(() => _occasionType = inferred);
+    }
   }
 
   @override
@@ -69,6 +83,7 @@ class _OccasionGroupDialogState extends State<_OccasionGroupDialog> {
     // showDialog'ın future'ı rota kapanır kapanmaz döner; kapanış animasyonu
     // sürerken TextField hâlâ bu controller'ları kullanır. Bu yüzden controller
     // ömrü dialog State'ine bağlıdır, future tamamlanınca silinmez.
+    _nameCtrl.removeListener(_onNameChanged);
     _nameCtrl.dispose();
     _emojiCtrl.dispose();
     super.dispose();
@@ -96,6 +111,7 @@ class _OccasionGroupDialogState extends State<_OccasionGroupDialog> {
         name,
         emoji: emoji.isEmpty ? null : emoji,
         color: _selectedColor,
+        occasionType: _occasionType,
       );
       ok = created != null;
     } else {
@@ -104,6 +120,7 @@ class _OccasionGroupDialogState extends State<_OccasionGroupDialog> {
         name: name,
         emoji: emoji,
         color: _selectedColor,
+        occasionType: _occasionType,
       );
     }
 
@@ -150,6 +167,31 @@ class _OccasionGroupDialogState extends State<_OccasionGroupDialog> {
                 labelText: 'Emoji (isteğe bağlı)',
                 hintText: '🎓',
               ),
+            ),
+            const SizedBox(height: 4),
+            DropdownButtonFormField<String>(
+              key: ValueKey('occasion-type-$_occasionType'),
+              initialValue: _occasionType,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Etkinlik tipi',
+                helperText: 'Öneri motoru parçaları bu tipe göre seçer',
+              ),
+              items: occasionTypeLabels.entries
+                  .map(
+                    (entry) => DropdownMenuItem<String>(
+                      value: entry.key,
+                      child: Text(entry.value),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() {
+                  _occasionType = value;
+                  _typeTouched = true;
+                });
+              },
             ),
             const SizedBox(height: 8),
             const Text(

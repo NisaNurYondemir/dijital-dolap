@@ -31,9 +31,15 @@ class OccasionProvider extends ChangeNotifier {
     String name, {
     String? emoji,
     String? color,
+    String? occasionType,
   }) async {
     try {
-      final group = await _repo.create(name, emoji: emoji, color: color);
+      final group = await _repo.create(
+        name,
+        emoji: emoji,
+        color: color,
+        occasionType: occasionType,
+      );
       _groups = [..._groups, group];
       _error = null;
       notifyListeners();
@@ -50,6 +56,7 @@ class OccasionProvider extends ChangeNotifier {
     String? name,
     String? emoji,
     String? color,
+    String? occasionType,
   }) async {
     try {
       final updated = await _repo.update(
@@ -57,6 +64,7 @@ class OccasionProvider extends ChangeNotifier {
         name: name,
         emoji: emoji,
         color: color,
+        occasionType: occasionType,
       );
       final i = _groups.indexWhere((g) => g.id == group.id);
       if (i != -1) {

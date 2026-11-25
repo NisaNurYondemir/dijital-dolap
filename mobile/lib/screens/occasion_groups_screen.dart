@@ -94,8 +94,9 @@ class _OccasionGroupsScreenState extends State<OccasionGroupsScreen> {
                       padding: EdgeInsets.only(left: 4, bottom: 16),
                       child: Text(
                         'Kombinlerini okul, iş, arkadaş, romantik, özel gün '
-                        'gibi amaçlara göre grupla. Kendi gruplarını da '
-                        'ekleyebilirsin.',
+                        'gibi amaçlara göre grupla. Her grubun bir etkinlik '
+                        'tipi var; öneri motoru parçaları bu tipe göre seçer. '
+                        'Kendi gruplarını da ekleyebilirsin.',
                         style: TextStyle(
                           fontSize: 13,
                           color: AppColors.slate,
@@ -184,9 +185,12 @@ class _GroupTile extends StatelessWidget {
               ),
               const SizedBox(width: 6),
             ],
-            Text(
-              group.isDefault ? 'Hazır grup' : 'Kendi grubun',
-              style: Theme.of(context).textTheme.bodySmall,
+            Flexible(
+              child: Text(
+                group.typeLabel,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             ),
           ],
         ),

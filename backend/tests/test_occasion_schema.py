@@ -27,6 +27,24 @@ def test_color_is_normalized_and_validated():
         OccasionGroupUpdate(color="#12345")
 
 
+def test_occasion_type_is_inferred_from_name():
+    assert OccasionGroupCreate(name="Düğün").occasion_type == "formal"
+    assert OccasionGroupCreate(name="Spor").occasion_type == "sport"
+    assert OccasionGroupCreate(name="İş").occasion_type == "work"
+    assert OccasionGroupCreate(name="Okul").occasion_type == "casual"
+    assert OccasionGroupCreate(name="Tatil").occasion_type == "casual"
+
+
+def test_occasion_type_can_be_explicit_and_validated():
+    assert (
+        OccasionGroupCreate(name="Kendi grubum", occasion_type="romantic")
+        .occasion_type
+        == "romantic"
+    )
+    with pytest.raises(ValidationError):
+        OccasionGroupCreate(name="Düğün", occasion_type="gece")
+
+
 def test_outfit_occasion_ids_are_optional():
     created = OutfitCreate(clothing_ids=[1, 2])
     assert created.occasion_ids == []

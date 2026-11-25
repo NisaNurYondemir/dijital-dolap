@@ -81,6 +81,7 @@ def create_group(
         name=req.name,
         emoji=req.emoji,
         color=req.color,
+        occasion_type=req.occasion_type,
         is_default=False,
     )
     db.add(group)
@@ -106,7 +107,8 @@ def update_group(
         raise HTTPException(409, "Bu isimde bir amaç grubu zaten var")
 
     for field, value in changes.items():
-        if field == "name" and value is None:
+        # Ad ve tip boşaltılamaz; emoji/renk null ile temizlenebilir.
+        if field in {"name", "occasion_type"} and value is None:
             continue
         setattr(group, field, value)
 

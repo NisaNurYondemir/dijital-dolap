@@ -106,7 +106,7 @@ class _EventOutfitsSheetState extends State<_EventOutfitsSheet> {
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
                     child: Text(
-                      'Kategori: ${occasion.label}',
+                      'Kategori: ${occasion.label} · ${occasion.typeLabel}',
                       style: Theme.of(context)
                           .textTheme
                           .bodySmall
@@ -148,8 +148,9 @@ class _EventOutfitsSheetState extends State<_EventOutfitsSheet> {
         child: Padding(
           padding: EdgeInsets.all(24),
           child: Text(
-            'Bu olay için öneri bulunamadı. Dolabına birkaç parça daha '
-            'eklemek veya olaya amaç grubu seçmek yardımcı olabilir.',
+            'Bu etkinlik için uygun kombin bulunamadı. Seçilen kategoriye '
+            'uygun parça yoksa dolabına birkaç parça ekleyebilir veya '
+            'kategori tipini değiştirebilirsin.',
             textAlign: TextAlign.center,
           ),
         ),

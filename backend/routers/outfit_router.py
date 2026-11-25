@@ -308,9 +308,12 @@ def suggest(
                 comfort_note=note,
             )
 
-    clothes = db.query(Clothing).filter(Clothing.user_id == current_user.id).all()
+    all_clothes = (
+        db.query(Clothing).filter(Clothing.user_id == current_user.id).all()
+    )
+    clothes = all_clothes
     history, pairs = _wear_signals(db, current_user, occasion)
-    style = _style_weights(db, current_user, clothes)
+    style = _style_weights(db, current_user, all_clothes)
 
     # Amaç seçiliyse ve o amaçla ilişkili yeterli parça varsa adayları daralt;
     # yoksa tüm dolaptan önererek yeni kullanıcıyı boş ekranla bırakma.
@@ -320,7 +323,7 @@ def suggest(
             for item_id, signals in history.items()
             if signals.occasion_wear_count or signals.occasion_outfit_count
         }
-        related = [item for item in clothes if item.id in related_ids]
+        related = [item for item in all_clothes if item.id in related_ids]
         has_top = any(group_of(item.category) == "ust" for item in related)
         has_bottom = any(group_of(item.category) == "alt" for item in related)
         has_dress = any(group_of(item.category) == "elbise" for item in related)
@@ -331,33 +334,33 @@ def suggest(
     outerwear = include_outerwear or (
         weather_ctx is not None and weather_ctx.needs_outerwear
     )
-    results = suggest_outfits(
-        clothes,
-        season=effective_season,
-        limit=limit,
-        include_shoes=include_shoes,
-        include_outerwear=outerwear,
-        history=history or None,
-        pair_history=pairs or None,
-        occasion_name=occasion.name if occasion else None,
-        weather=weather_ctx,
-        style=style,
-    )
-    if not results and weather_season and season is None:
-        # Hava filtresi dolabı sıfırladıysa mevsim kısıtını bırakır; hava
-        # açıklamaları yine de önerilerin nedenlerine işlenir.
-        results = suggest_outfits(
-            clothes,
-            season=None,
+
+    def _run(candidate_clothes, season_value: Optional[str]):
+        return suggest_outfits(
+            candidate_clothes,
+            season=season_value,
             limit=limit,
             include_shoes=include_shoes,
             include_outerwear=outerwear,
             history=history or None,
             pair_history=pairs or None,
             occasion_name=occasion.name if occasion else None,
+            occasion_type=occasion.occasion_type if occasion else None,
             weather=weather_ctx,
             style=style,
         )
+
+    results = _run(clothes, effective_season)
+    # İlişkili parçalar etkinlik kurallarına takıldıysa tüm dolaba dön;
+    # böylece daraltma yüzünden boş ekran oluşmaz.
+    if not results and clothes is not all_clothes:
+        results = _run(all_clothes, effective_season)
+    if not results and weather_season and season is None:
+        # Hava filtresi dolabı sıfırladıysa mevsim kısıtını bırakır; hava
+        # açıklamaları yine de önerilerin nedenlerine işlenir.
+        results = _run(clothes, None)
+        if not results and clothes is not all_clothes:
+            results = _run(all_clothes, None)
     return [
         OutfitSuggestion(
             score=round(r.score, 3),

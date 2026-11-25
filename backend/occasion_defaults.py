@@ -2,15 +2,15 @@ from sqlalchemy.orm import Session
 
 from models.occasion import OccasionGroup
 
-# (ad, emoji, renk)
-DEFAULT_OCCASIONS: list[tuple[str, str, str]] = [
-    ("Okul", "🎓", "#4C6FFF"),
-    ("İş", "💼", "#22305A"),
-    ("Arkadaş", "☕", "#F2B84B"),
-    ("Romantik", "❤️", "#E85D75"),
-    ("Özel gün", "✨", "#9B51E0"),
-    ("Spor", "🏃", "#27AE60"),
-    ("Günlük", "🌤️", "#5B6478"),
+# (ad, emoji, renk, etkinlik tipi)
+DEFAULT_OCCASIONS: list[tuple[str, str, str, str]] = [
+    ("Okul", "🎓", "#4C6FFF", "casual"),
+    ("İş", "💼", "#22305A", "work"),
+    ("Arkadaş", "☕", "#F2B84B", "casual"),
+    ("Romantik", "❤️", "#E85D75", "romantic"),
+    ("Özel gün", "✨", "#9B51E0", "formal"),
+    ("Spor", "🏃", "#27AE60", "sport"),
+    ("Günlük", "🌤️", "#5B6478", "casual"),
 ]
 
 
@@ -35,9 +35,10 @@ def seed_default_occasions(db: Session, user_id: int) -> list[OccasionGroup]:
             name=name,
             emoji=emoji,
             color=color,
+            occasion_type=occasion_type,
             is_default=True,
         )
-        for name, emoji, color in DEFAULT_OCCASIONS
+        for name, emoji, color, occasion_type in DEFAULT_OCCASIONS
     ]
     db.add_all(groups)
     db.commit()

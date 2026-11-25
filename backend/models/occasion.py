@@ -36,6 +36,11 @@ class OccasionGroup(Base):
     name = Column(String, nullable=False)
     emoji = Column(String, nullable=True)
     color = Column(String, nullable=True)   # "#4C6FFF"
+    # Öneri motorunun kullandığı etkinlik tipi:
+    # formal / work / sport / casual / romantic
+    occasion_type = Column(
+        String(20), nullable=False, default="casual", server_default="casual"
+    )
     is_default = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

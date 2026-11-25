@@ -12,7 +12,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
 
+from category_utils import normalize_category
 from color_engine import ItemProfile, evaluate_outfit
+from occasion_rules import is_blocked, occasion_label, outfit_occasion_fit
 from style_profile import StyleWeights, hue_bucket, style_affinity
 
 MAX_PER_GROUP = 40   # her gruptan en fazla bu kadar parça değerlendirilir
@@ -37,14 +39,9 @@ CATEGORY_GROUPS = {
                  "terlik", "topuklu"},
 }
 
-_TR = str.maketrans("İIıŞşĞğÜüÖöÇç", "iiissgguuoocc")
-
-
 def normalize(text: str) -> str:
-    text = text.translate(_TR).lower()
-    for ch in (" ", "-", "_"):
-        text = text.replace(ch, "")
-    return text.strip()
+    """Geriye dönük uyumluluk için ortak normalizasyonu kullanır."""
+    return normalize_category(text)
 
 
 def group_of(category: str) -> Optional[str]:
@@ -119,6 +116,7 @@ class Suggestion:
     score: float
     color_score: float = 0.0
     pattern_score: float = 1.0
+    occasion_score: float = 1.0
     reasons: list[str] = field(default_factory=list)
 
 
@@ -132,8 +130,14 @@ def _profiles(items) -> list[ItemProfile]:
     return [ItemProfile.from_item(i, scope=scope_of(i)) for i in items]
 
 
-def _is_candidate(item, season: Optional[str]) -> bool:
+def _is_candidate(
+    item,
+    season: Optional[str],
+    occasion_type: Optional[str] = None,
+) -> bool:
     if not item.is_wearable:
+        return False
+    if occasion_type and is_blocked(item.category, occasion_type):
         return False
     return season is None or item.season in (season, "tum")
 
@@ -246,6 +250,7 @@ def _reasons(
     weather: Optional[WeatherContext] = None,
     style_aff: Optional[float] = None,
     pattern_reasons: Optional[list[str]] = None,
+    occasion_type: Optional[str] = None,
 ) -> list[str]:
     reasons: list[str] = []
     if weather is not None:
@@ -261,6 +266,9 @@ def _reasons(
 
     if pattern_reasons:
         reasons.extend(pattern_reasons)
+
+    if occasion_type:
+        reasons.append(f"{occasion_label(occasion_type)} için uygun parçalar")
 
     if style_aff is not None and style_aff >= 0.7:
         reasons.append("Tarzına uygun parçalar")
@@ -325,6 +333,7 @@ def suggest_outfits(
     history: Optional[dict[int, ItemHistory]] = None,
     pair_history: Optional[dict[tuple[int, int], PairHistory]] = None,
     occasion_name: Optional[str] = None,
+    occasion_type: Optional[str] = None,
     now: Optional[datetime] = None,
     weather: Optional[WeatherContext] = None,
     style: Optional[StyleWeights] = None,
@@ -336,7 +345,7 @@ def suggest_outfits(
 
     groups: dict[str, list] = {g: [] for g in CATEGORY_GROUPS}
     for item in clothes:
-        if not _is_candidate(item, season):
+        if not _is_candidate(item, season, occasion_type):
             continue
         group = group_of(item.category)
         if group:
@@ -368,6 +377,9 @@ def suggest_outfits(
         compat, color, pattern_score, pattern_reasons = evaluate_outfit(
             _profiles(outfit)
         )
+        occasion_fit = outfit_occasion_fit(outfit, occasion_type)
+        if occasion_fit <= 0:
+            continue
         item_histories = [
             history.get(item.id) if history else None for item in outfit
         ]
@@ -423,6 +435,10 @@ def suggest_outfits(
                     + 0.15 * affinity
                 )
             score = compat * (0.80 + 0.20 * preference)
+        if occasion_type:
+            # Yumuşak uyuşmazlıklar skoru düşürsün; sert olanlar zaten
+            # aday listesinden çıkarıldı.
+            score *= 0.75 + 0.25 * occasion_fit
         score = min(score, 1.0)
 
         suggestions.append(
@@ -431,6 +447,7 @@ def suggest_outfits(
                 score=score,
                 color_score=color,
                 pattern_score=pattern_score,
+                occasion_score=occasion_fit,
                 reasons=_reasons(
                     outfit,
                     color,
@@ -441,6 +458,7 @@ def suggest_outfits(
                     weather=weather,
                     style_aff=style_aff,
                     pattern_reasons=pattern_reasons,
+                    occasion_type=occasion_type,
                 ),
             )
         )
