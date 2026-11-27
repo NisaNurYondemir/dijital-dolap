@@ -5,16 +5,23 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, selectinload
 
 from auth import get_db, get_current_user
-from color_engine import ItemProfile, evaluate_outfit
 from models.clothing import Clothing
 from models.occasion import OccasionGroup
 from models.outfit import Outfit, WearHistory
 from models.user import User
+from outfit_scoring import score_outfit
 from schemas.clothing import ClothingOut, Season
-from schemas.outfit import OutfitCreate, OutfitOut, OutfitSuggestion, OutfitUpdate
+from schemas.outfit import (
+    OutfitCreate,
+    OutfitEvaluateRequest,
+    OutfitOut,
+    OutfitScoreOut,
+    OutfitSuggestion,
+    OutfitUpdate,
+)
 from schemas.wear import WearOut
 from suggestion import (
-    ItemHistory, PairHistory, WeatherContext, group_of, scope_of, suggest_outfits,
+    ItemHistory, PairHistory, WeatherContext, group_of, suggest_outfits,
 )
 from style_profile import (
     StyleItem,
@@ -30,7 +37,7 @@ router = APIRouter(prefix="/outfits", tags=["outfits"])
 def get_owned_outfit(outfit_id: int, db: Session, user: User) -> Outfit:
     outfit = (
         db.query(Outfit)
-        .options(selectinload(Outfit.groups))
+        .options(selectinload(Outfit.groups), selectinload(Outfit.clothes))
         .filter(
             Outfit.id == outfit_id,
             Outfit.user_id == user.id,
@@ -40,6 +47,26 @@ def get_owned_outfit(outfit_id: int, db: Session, user: User) -> Outfit:
     if not outfit:
         raise HTTPException(404, "Kombin bulunamadı")
     return outfit
+
+
+def _outfit_out(outfit: Outfit) -> OutfitOut:
+    """Kaydedilmiş kombini güncel uyum puanıyla birlikte döndürür."""
+    base = OutfitOut.model_validate(outfit)
+    if len(outfit.clothes) < 2:
+        return base
+    occasion_type = (
+        outfit.groups[0].occasion_type if outfit.groups else None
+    )
+    result = score_outfit(outfit.clothes, occasion_type)
+    return base.model_copy(
+        update={
+            "score": result.score,
+            "color_score": result.color_score,
+            "pattern_score": result.pattern_score,
+            "occasion_score": result.occasion_score,
+            "reasons": result.reasons,
+        }
+    )
 
 
 def resolve_clothes(clothing_ids: list[int], db: Session, user: User) -> list[Clothing]:
@@ -95,7 +122,7 @@ def create_outfit(
     db.add(outfit)
     db.commit()
     db.refresh(outfit)
-    return get_owned_outfit(outfit.id, db, current_user)
+    return _outfit_out(get_owned_outfit(outfit.id, db, current_user))
 
 
 @router.get("/", response_model=list[OutfitOut])
@@ -106,14 +133,15 @@ def list_outfits(
 ):
     query = (
         db.query(Outfit)
-        .options(selectinload(Outfit.groups))
+        .options(selectinload(Outfit.groups), selectinload(Outfit.clothes))
         .filter(Outfit.user_id == current_user.id)
     )
     if occasion_id is not None:
         query = query.join(Outfit.groups).filter(
             OccasionGroup.id == occasion_id
         )
-    return query.order_by(Outfit.created_at.desc(), Outfit.id.desc()).all()
+    rows = query.order_by(Outfit.created_at.desc(), Outfit.id.desc()).all()
+    return [_outfit_out(outfit) for outfit in rows]
 
 def _wear_signals(
     db: Session,
@@ -366,11 +394,44 @@ def suggest(
             score=round(r.score, 3),
             color_score=round(r.color_score, 3),
             pattern_score=round(r.pattern_score, 3),
+            occasion_score=round(r.occasion_score, 3),
             reasons=r.reasons,
             clothes=[ClothingOut.model_validate(i) for i in r.items],
         )
         for r in results
     ]
+
+
+@router.post("/evaluate", response_model=OutfitScoreOut)
+def evaluate_selection(
+    req: OutfitEvaluateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Kullanıcının seçtiği parçaları kaydetmeden önce puanlar."""
+    clothes = resolve_clothes(req.clothing_ids, db, current_user)
+    occasion_type: Optional[str] = None
+    if req.occasion_id is not None:
+        occasion = (
+            db.query(OccasionGroup)
+            .filter(
+                OccasionGroup.id == req.occasion_id,
+                OccasionGroup.user_id == current_user.id,
+            )
+            .first()
+        )
+        if not occasion:
+            raise HTTPException(404, "Amaç grubu bulunamadı")
+        occasion_type = occasion.occasion_type
+    result = score_outfit(clothes, occasion_type)
+    return OutfitScoreOut(
+        score=result.score,
+        color_score=result.color_score,
+        pattern_score=result.pattern_score,
+        occasion_score=result.occasion_score,
+        reasons=result.reasons,
+    )
+
 
 @router.get("/{outfit_id}", response_model=OutfitOut)
 def get_outfit(
@@ -378,7 +439,7 @@ def get_outfit(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return get_owned_outfit(outfit_id, db, current_user)
+    return _outfit_out(get_owned_outfit(outfit_id, db, current_user))
 
 
 @router.get("/{outfit_id}/history", response_model=list[WearOut])
@@ -430,7 +491,7 @@ def update_outfit(
 
     db.commit()
     db.refresh(outfit)
-    return get_owned_outfit(outfit.id, db, current_user)
+    return _outfit_out(get_owned_outfit(outfit.id, db, current_user))
 
 
 @router.delete("/{outfit_id}", status_code=204)
@@ -450,16 +511,17 @@ def get_outfit_score(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Kombinin renk ve desen uyum skorlarını döner (0-1)."""
+    """Kombinin renk, desen ve etkinlik uyum skorlarını döner (0-1)."""
     outfit = get_owned_outfit(outfit_id, db, current_user)
-    profiles = [
-        ItemProfile.from_item(c, scope=scope_of(c))
-        for c in outfit.clothes
-    ]
-    total, color, pattern, _ = evaluate_outfit(profiles)
+    occasion_type = (
+        outfit.groups[0].occasion_type if outfit.groups else None
+    )
+    result = score_outfit(outfit.clothes, occasion_type)
     return {
         "outfit_id": outfit_id,
-        "score": round(total, 3),
-        "color_score": round(color, 3),
-        "pattern_score": round(pattern, 3),
+        "score": result.score,
+        "color_score": result.color_score,
+        "pattern_score": result.pattern_score,
+        "occasion_score": result.occasion_score,
+        "reasons": result.reasons,
     }

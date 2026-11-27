@@ -8,6 +8,7 @@ import 'package:dijital_dolap/providers/occasion_provider.dart';
 import 'package:dijital_dolap/providers/outfit_provider.dart';
 import 'package:dijital_dolap/providers/wear_provider.dart';
 import 'package:dijital_dolap/providers/weather_provider.dart';
+import 'package:dijital_dolap/screens/new_outfit_screen.dart';
 import 'package:dijital_dolap/screens/outfit_detail_screen.dart';
 import 'package:dijital_dolap/theme/app_theme.dart';
 import 'package:dijital_dolap/widgets/clothing_thumb.dart';
@@ -43,6 +44,19 @@ class _OutfitsScreenState extends State<OutfitsScreen>
     super.dispose();
   }
 
+  Future<void> _openNewOutfit() async {
+    final created = await Navigator.of(context).push<Outfit>(
+      MaterialPageRoute(builder: (_) => const NewOutfitScreen()),
+    );
+    if (!mounted || created == null) return;
+    _tabs.animateTo(1);
+    await context.read<OutfitProvider>().loadAll();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Kombin kaydedildi!')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -55,6 +69,12 @@ class _OutfitsScreenState extends State<OutfitsScreen>
             Tab(text: 'Kombinlerim'),
           ],
         ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'new_outfit_fab',
+        onPressed: _openNewOutfit,
+        icon: const Icon(Icons.add),
+        label: const Text('Yeni kombin'),
       ),
       body: TabBarView(
         controller: _tabs,
@@ -478,8 +498,6 @@ class _SuggestionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-
     return InkWell(
       borderRadius: BorderRadius.circular(18),
       onTap: () {
@@ -512,9 +530,7 @@ class _SuggestionCard extends StatelessWidget {
           const SizedBox(height: 10),
           // Uyum skoru
           if (outfit.scoreLabel.isNotEmpty)
-            Text(outfit.scoreLabel,
-                style: text.bodySmall
-                    ?.copyWith(color: AppColors.thread, fontWeight: FontWeight.w600)),
+            _OutfitScoreSummary(outfit: outfit),
           if (outfit.reasons.isNotEmpty) ...[
             const SizedBox(height: 8),
             Wrap(
@@ -719,8 +735,10 @@ class _MyOutfitsTabState extends State<_MyOutfitsTab> {
                         padding: const EdgeInsets.all(32),
                         child: Text(
                           selectedId == null
-                              ? 'Henüz kaydedilmiş kombin yok.'
-                              : 'Bu grupta kombin yok. Kartlardaki "Grupla" ile ekleyebilirsin.',
+                              ? 'Henüz kaydedilmiş kombin yok. Sağ alttaki '
+                                  '"Yeni kombin" ile kendi kombinini oluştur.'
+                              : 'Bu grupta kombin yok. Kartlardaki "Grupla" '
+                                  'ile ekleyebilirsin.',
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -822,8 +840,12 @@ class _SavedOutfitCard extends StatelessWidget {
               ),
             ],
           ),
-          if (outfit.description?.isNotEmpty == true) ...[
+          if (outfit.scoreLabel.isNotEmpty) ...[
             const SizedBox(height: 2),
+            _OutfitScoreSummary(outfit: outfit),
+          ],
+          if (outfit.description?.isNotEmpty == true) ...[
+            const SizedBox(height: 4),
             Text(
               outfit.description!,
               maxLines: 2,
@@ -852,6 +874,63 @@ class _SavedOutfitCard extends StatelessWidget {
         ],
       ),
       ),
+    );
+  }
+}
+
+class _OutfitScoreSummary extends StatelessWidget {
+  const _OutfitScoreSummary({required this.outfit});
+
+  final Outfit outfit;
+
+  @override
+  Widget build(BuildContext context) {
+    if (outfit.scoreLabel.isEmpty) return const SizedBox.shrink();
+    final badge = outfit.scoreBadgeLabel;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            if (badge.isNotEmpty)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.thread.withValues(alpha: 0.22),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  badge,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.ink,
+                  ),
+                ),
+              ),
+            if (badge.isNotEmpty) const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                outfit.scoreLabel,
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.slate,
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (outfit.scoreBreakdown.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              outfit.scoreBreakdown,
+              style: const TextStyle(fontSize: 10.5, color: AppColors.slate),
+            ),
+          ),
+      ],
     );
   }
 }

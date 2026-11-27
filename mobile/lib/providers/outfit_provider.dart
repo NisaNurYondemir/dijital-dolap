@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:dijital_dolap/data/outfit_repository.dart';
 import 'package:dijital_dolap/models/outfit.dart';
+import 'package:dijital_dolap/models/outfit_score.dart';
 
 class OutfitProvider extends ChangeNotifier {
   final _repo = OutfitRepository();
@@ -83,15 +84,38 @@ class OutfitProvider extends ChangeNotifier {
     List<int> clothingIds, {
     List<int> occasionIds = const [],
     bool isFavorite = false,
+    String? name,
+    String? description,
   }) async {
     final outfit = await _repo.create(
       clothingIds,
       occasionIds: occasionIds,
       isFavorite: isFavorite,
+      name: name,
+      description: description,
     );
     _outfits.insert(0, outfit);
     notifyListeners();
     return outfit;
+  }
+
+  /// Manuel kombin ekranında canlı uyum puanı için.
+  Future<OutfitScore?> evaluate(
+    List<int> clothingIds, {
+    int? occasionId,
+  }) async {
+    try {
+      final result = await _repo.evaluate(
+        clothingIds,
+        occasionId: occasionId,
+      );
+      _mutationError = null;
+      return result;
+    } catch (e) {
+      _mutationError = e.toString();
+      notifyListeners();
+      return null;
+    }
   }
 
   Future<bool> setOccasions(Outfit outfit, List<int> occasionIds) async {

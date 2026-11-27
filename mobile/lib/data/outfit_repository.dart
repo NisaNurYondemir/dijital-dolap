@@ -1,5 +1,6 @@
 import 'package:dijital_dolap/data/api_client.dart';
 import 'package:dijital_dolap/models/outfit.dart';
+import 'package:dijital_dolap/models/outfit_score.dart';
 import 'package:dijital_dolap/models/wear_entry.dart';
 
 class OutfitRepository {
@@ -34,6 +35,18 @@ class OutfitRepository {
     return res
         .map((e) => Outfit.fromSuggestion(e as Map<String, dynamic>))
         .toList();
+  }
+
+  /// Kaydetmeden önce seçilen parçaların uyum puanını hesaplar.
+  Future<OutfitScore> evaluate(
+    List<int> clothingIds, {
+    int? occasionId,
+  }) async {
+    final res = await _api.post('/outfits/evaluate', body: {
+      'clothing_ids': clothingIds,
+      'occasion_id': ?occasionId,
+    });
+    return OutfitScore.fromJson(res as Map<String, dynamic>);
   }
 
   Future<Outfit> create(

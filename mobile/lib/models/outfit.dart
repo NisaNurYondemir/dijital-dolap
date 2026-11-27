@@ -12,6 +12,8 @@ class Outfit {
   final DateTime? createdAt;
   final double? score;
   final double? colorScore;
+  final double? patternScore;
+  final double? occasionScore;
   final List<String> reasons;
 
   Outfit({
@@ -25,6 +27,8 @@ class Outfit {
     this.createdAt,
     this.score,
     this.colorScore,
+    this.patternScore,
+    this.occasionScore,
     this.reasons = const [],
   });
 
@@ -47,6 +51,8 @@ class Outfit {
           : null,
       score: (json['score'] as num?)?.toDouble(),
       colorScore: (json['color_score'] as num?)?.toDouble(),
+      patternScore: (json['pattern_score'] as num?)?.toDouble(),
+      occasionScore: (json['occasion_score'] as num?)?.toDouble(),
       reasons: (json['reasons'] as List<dynamic>? ?? const [])
           .map((e) => e.toString())
           .toList(),
@@ -61,6 +67,8 @@ class Outfit {
           .toList(),
       score: (json['score'] as num?)?.toDouble(),
       colorScore: (json['color_score'] as num?)?.toDouble(),
+      patternScore: (json['pattern_score'] as num?)?.toDouble(),
+      occasionScore: (json['occasion_score'] as num?)?.toDouble(),
       reasons: (json['reasons'] as List<dynamic>? ?? const [])
           .map((e) => e.toString())
           .toList(),
@@ -84,6 +92,8 @@ class Outfit {
       createdAt: createdAt,
       score: score,
       colorScore: colorScore,
+      patternScore: patternScore,
+      occasionScore: occasionScore,
       reasons: reasons,
     );
   }
@@ -92,11 +102,36 @@ class Outfit {
       ? name!
       : (id != null ? 'Kombin #$id' : 'Öneri');
 
+  double? get compatibilityScore => score ?? colorScore;
+
+  int? get scorePercent {
+    final value = compatibilityScore;
+    return value == null ? null : (value * 100).round();
+  }
+
+  String get scoreBadgeLabel =>
+      scorePercent == null ? '' : 'Uyum %$scorePercent';
+
   String get scoreLabel {
-    final value = colorScore ?? score;
+    final value = compatibilityScore;
     if (value == null) return '';
     if (value >= 0.85) return '★ Mükemmel uyum';
-    if (value >= 0.75) return '★ İyi uyum';
-    return '★ Kabul edilebilir';
+    if (value >= 0.70) return '★ İyi uyum';
+    if (value >= 0.50) return '★ Kabul edilebilir';
+    return '★ Uyumsuz';
+  }
+
+  String get scoreBreakdown {
+    final parts = <String>[];
+    if (colorScore != null) {
+      parts.add('Renk %${(colorScore! * 100).round()}');
+    }
+    if (patternScore != null) {
+      parts.add('Desen %${(patternScore! * 100).round()}');
+    }
+    if (occasionScore != null && occasionScore! < 0.999) {
+      parts.add('Etkinlik %${(occasionScore! * 100).round()}');
+    }
+    return parts.join(' · ');
   }
 }

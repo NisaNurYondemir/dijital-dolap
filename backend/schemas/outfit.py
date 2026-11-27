@@ -39,6 +39,21 @@ class OutfitUpdate(BaseModel):
         return value or None
 
 
+class OutfitEvaluateRequest(BaseModel):
+    """Kaydetmeden önce seçilen parçaların uyumunu hesaplamak için."""
+
+    clothing_ids: list[int] = Field(min_length=1)
+    occasion_id: Optional[int] = None
+
+
+class OutfitScoreOut(BaseModel):
+    score: float
+    color_score: float
+    pattern_score: float
+    occasion_score: float = 1.0
+    reasons: list[str] = []
+
+
 class OutfitOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -50,10 +65,17 @@ class OutfitOut(BaseModel):
     description: Optional[str] = None
     clothes: list[ClothingOut]
     groups: list[OccasionGroupOut] = []
+    score: Optional[float] = None
+    color_score: Optional[float] = None
+    pattern_score: Optional[float] = None
+    occasion_score: Optional[float] = None
+    reasons: list[str] = []
+
 
 class OutfitSuggestion(BaseModel):
     score: float
     color_score: float = 0.0
     pattern_score: float = 1.0
+    occasion_score: float = 1.0
     reasons: list[str] = []
     clothes: list[ClothingOut]

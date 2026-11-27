@@ -206,40 +206,101 @@ class _OutfitDetailScreenState extends State<OutfitDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    if (_outfit.scoreLabel.isNotEmpty)
-                      Text(
-                        _outfit.scoreLabel,
-                        style: text.bodySmall?.copyWith(
-                          color: AppColors.thread,
-                          fontWeight: FontWeight.w700,
+                if (_outfit.scoreLabel.isNotEmpty) ...[
+                  Row(
+                    children: [
+                      if (_outfit.scoreBadgeLabel.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.thread.withValues(alpha: 0.22),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            _outfit.scoreBadgeLabel,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.ink,
+                            ),
+                          ),
                         ),
-                      ),
-                    for (final group in _outfit.groups)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: group.color.withValues(alpha: 0.16),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
+                      const SizedBox(width: 8),
+                      Expanded(
                         child: Text(
-                          group.label,
-                          style: const TextStyle(
-                            fontSize: 11,
+                          _outfit.scoreLabel,
+                          style: text.bodySmall?.copyWith(
+                            color: AppColors.slate,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.ink,
                           ),
                         ),
                       ),
-                  ],
-                ),
+                    ],
+                  ),
+                  if (_outfit.scoreBreakdown.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        _outfit.scoreBreakdown,
+                        style: text.bodySmall,
+                      ),
+                    ),
+                ],
+                if (_outfit.groups.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      for (final group in _outfit.groups)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: group.color.withValues(alpha: 0.16),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            group.label,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.ink,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+                if (_outfit.reasons.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  for (final reason in _outfit.reasons.take(5))
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 3),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(
+                            Icons.check_circle_outline,
+                            size: 14,
+                            color: AppColors.slate,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              reason,
+                              style: text.bodySmall,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
                 if (_outfit.description?.isNotEmpty == true) ...[
                   const SizedBox(height: 10),
                   Text(

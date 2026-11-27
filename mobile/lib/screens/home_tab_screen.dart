@@ -8,11 +8,15 @@ import 'package:dijital_dolap/models/outfit.dart';
 import 'package:dijital_dolap/models/wear_entry.dart';
 import 'package:dijital_dolap/providers/calendar_provider.dart';
 import 'package:dijital_dolap/providers/clothing_provider.dart';
+import 'package:dijital_dolap/providers/outfit_provider.dart';
 import 'package:dijital_dolap/providers/wear_provider.dart';
 import 'package:dijital_dolap/providers/weather_provider.dart';
 import 'package:dijital_dolap/screens/laundry_screen.dart';
+import 'package:dijital_dolap/screens/new_outfit_screen.dart';
+import 'package:dijital_dolap/screens/outfit_detail_screen.dart';
 import 'package:dijital_dolap/theme/app_theme.dart';
 import 'package:dijital_dolap/utils/error_text.dart';
+import 'package:dijital_dolap/widgets/clothing_thumb.dart';
 import 'package:dijital_dolap/widgets/event_outfits_sheet.dart';
 import 'package:dijital_dolap/widgets/mini_calendar.dart';
 
@@ -63,6 +67,18 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
       if (!mounted) return;
       setState(() => _suggestionsError = 'Bağlantı hatası: $e');
     }
+  }
+
+  Future<void> _openNewOutfit() async {
+    final created = await Navigator.of(context).push<Outfit>(
+      MaterialPageRoute(builder: (_) => const NewOutfitScreen()),
+    );
+    if (!mounted || created == null) return;
+    await context.read<OutfitProvider>().loadAll();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Kombin kaydedildi!')),
+    );
   }
 
   @override
@@ -167,6 +183,15 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
             const _SectionHeader(title: 'Son giyilen kombin'),
             const SizedBox(height: 8),
             _LastWornCard(entries: wear.entries),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _openNewOutfit,
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('Kendi kombinini oluştur'),
+              ),
+            ),
             const SizedBox(height: 20),
 
             // ── Kirli kıyafet durumu ──
@@ -263,83 +288,115 @@ class _BestSuggestionCard extends StatelessWidget {
     }
     final best = list.first;
     final ready = best.clothes.every((c) => c.isWearable);
-    return _Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => OutfitDetailScreen(outfit: best),
+          ),
+        ),
+        child: _Card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
+              SizedBox(
+                height: 104,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: best.clothes.take(6).length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
+                  itemBuilder: (_, i) => ClothingThumb(
+                    item: best.clothes[i],
+                    width: 82,
+                    height: 104,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              if (best.scoreLabel.isNotEmpty) ...[
+                Row(
                   children: [
-                    for (final c in best.clothes.take(6))
-                      _ItemPill(item: c),
+                    if (best.scoreBadgeLabel.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.thread.withValues(alpha: 0.22),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          best.scoreBadgeLabel,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.ink,
+                          ),
+                        ),
+                      ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        best.scoreLabel,
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.slate,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            best.reasons.take(2).join(' · '),
-            style: const TextStyle(fontSize: 12.5, color: AppColors.slate,
-                height: 1.35),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(
-                ready ? Icons.check_circle : Icons.error_outline,
-                size: 15,
-                color: ready ? Colors.green.shade700 : Colors.orange.shade900,
-              ),
-              const SizedBox(width: 5),
+                if (best.scoreBreakdown.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      best.scoreBreakdown,
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        color: AppColors.slate,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 6),
+              ],
               Text(
-                ready ? 'Hepsi hazır' : 'Bazı parçalar hazırlanmalı',
-                style: TextStyle(
+                best.reasons.take(2).join(' · '),
+                style: const TextStyle(
                   fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                  color: ready ? Colors.green.shade700 : Colors.orange.shade900,
+                  color: AppColors.slate,
+                  height: 1.35,
                 ),
               ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(
+                    ready ? Icons.check_circle : Icons.error_outline,
+                    size: 15,
+                    color: ready
+                        ? Colors.green.shade700
+                        : Colors.orange.shade900,
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    ready ? 'Hepsi hazır' : 'Bazı parçalar hazırlanmalı',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: ready
+                          ? Colors.green.shade700
+                          : Colors.orange.shade900,
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ItemPill extends StatelessWidget {
-  const _ItemPill({required this.item});
-
-  final ClothingItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final ready = item.isWearable;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: ready ? Colors.grey.shade100 : Colors.orange.shade100,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            ready ? Icons.check : Icons.error_outline,
-            size: 13,
-            color: ready ? Colors.green.shade700 : Colors.orange.shade900,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            categoryLabel(item.category),
-            style: const TextStyle(fontSize: 12),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -382,45 +439,58 @@ class _LastWornCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (last.clothes.isNotEmpty)
+            SizedBox(
+              height: 96,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: last.clothes.take(6).length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (_, i) => ClothingThumb(
+                  item: last.clothes[i],
+                  width: 76,
+                  height: 96,
+                ),
+              ),
+            ),
+          const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
-                child: Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    for (final c in last.clothes.take(6))
-                      _WornPill(label: categoryLabel(c.category)),
-                  ],
+                child: Text(
+                  wornText,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.slate,
+                  ),
                 ),
               ),
+              if (last.hasRating) ...[
+                const Icon(Icons.star_rounded,
+                    size: 17, color: AppColors.thread),
+                Text(
+                  '${last.rating}/5',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.ink,
+                  ),
+                ),
+              ],
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            wornText,
-            style: const TextStyle(fontSize: 12.5, color: AppColors.slate),
-          ),
+          if (last.occasion?.isNotEmpty == true) ...[
+            const SizedBox(height: 3),
+            Text(
+              last.occasion!,
+              style: const TextStyle(
+                fontSize: 11.5,
+                color: AppColors.slate,
+              ),
+            ),
+          ],
         ],
       ),
-    );
-  }
-}
-
-class _WornPill extends StatelessWidget {
-  const _WornPill({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: AppColors.thread,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(label, style: const TextStyle(fontSize: 12)),
     );
   }
 }
